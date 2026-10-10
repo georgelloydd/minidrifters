@@ -225,3 +225,5 @@ body.touch #hud{top:calc(64px + env(safe-area-inset-top))}
 .rpbar{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:60;display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;max-width:96vw;background:rgba(10,10,12,.88);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:10px 12px;backdrop-filter:blur(6px)}
 .rpbar .row{display:flex;gap:4px;margin:0}.rpbar .opt{padding:8px 11px;font-size:11px}.rpbar .opt.on{background:#ff3b3b;color:#fff;border-color:transparent}#rpScrub{width:220px;padding:0;accent-color:#ff3b3b}
 #rpRec.on{animation:rpb 1s infinite}@keyframes rpb{50%{opacity:.5}}
+
+#lbTable canvas.lbcar{width:48px;height:30px;vertical-align:middle;margin:-6px 8px -6px -4px}

@@ -7,7 +7,7 @@ async function watchRow(tr, row, btn) {
   if (!decRep(rep) && row.pid === ACCT.pub) rep = localStorage.getItem('md_rep_' + tr);
   if (btn) btn.textContent = 'Watch';
   if (!decRep(rep)) return alert('There is no replay for this lap yet. Replays are saved with new personal bests.');
-  openReplay(tr, rep, row.pid === ACCT.pub ? CFG : { color: liveCol(row), body: row.body }, row.name, row.lap);
+  openReplay(tr, rep, lookOf(row), row.name, row.lap);
 }
 function openReplay(track, rep, look, name, lapMs) {
   const L = decRep(rep); if (!L || L.length < 5) return alert('No replay for this lap.');
@@ -25,7 +25,7 @@ function rpSample(t) {
   const P = L[Math.max(0, i - 1)], A = L[i], B = L[Math.min(L.length - 1, i + 1)], Q = L[Math.min(L.length - 1, i + 2)], f2 = f * f, f3 = f2 * f;
   const cr = (p0, p1, p2, p3) => 0.5 * (2 * p1 + (p2 - p0) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f2 + (3 * p1 - p0 - 3 * p2 + p3) * f3);
   const cd = (p0, p1, p2, p3) => 0.5 * ((p2 - p0) + 2 * (2 * p0 - 5 * p1 + 4 * p2 - p3) * f + 3 * (3 * p1 - p0 - 3 * p2 + p3) * f2);
-  const a1 = A[2] / 100, a0 = a1 + angDiff(P[2] / 100, a1), a2 = a1 + angDiff(B[2] / 100, a1), a3 = a2 + angDiff(Q[2] / 100, B[2] / 100);
+  const a1 = A[2], a0 = a1 + angDiff(P[2], a1), a2 = a1 + angDiff(B[2], a1), a3 = a2 + angDiff(Q[2], B[2]);
   if (Math.hypot(B[0] - A[0], B[1] - A[1]) > 300) { c.x = A[0]; c.y = A[1]; c.a = a1; c.vx = c.vy = 0; }
   else { c.x = cr(P[0], A[0], B[0], Q[0]); c.y = cr(P[1], A[1], B[1], Q[1]); c.a = cr(a0, a1, a2, a3); c.vx = cd(P[0], A[0], B[0], Q[0]) * 10; c.vy = cd(P[1], A[1], B[1], Q[1]) * 10; }
   c.speed = Math.hypot(c.vx, c.vy); c.slip = c.speed > 60 ? angDiff(Math.atan2(c.vy, c.vx), c.a) : 0; c.drift = Math.abs(c.slip) > 0.22 && c.speed > 220; c.steer = Math.max(-0.8, Math.min(0.8, -c.slip * 2)); c.brake = false;

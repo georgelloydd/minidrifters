@@ -38,7 +38,7 @@ const ACCT = {
   },
   // lets the admin dev site look up a forgotten key by player name (needs register_key from supabase-admin.sql; silently skipped if missing)
   register() { if (CLOUD && this.key && this.reg) sb('POST', 'rpc/register_key', { p_key: this.key, p_name: CFG.name }).catch(() => { }); },
-  data() { return { cfg: Object.assign({ name: CFG.name }, carLook(CFG)), stats: this.stats, reg: this.reg }; },
+  data() { return { cfg: Object.assign({ name: CFG.name }, carLook(CFG)), stats: this.stats, reg: this.reg, pub: this.pub }; },
   save(localOnly) {
     if (!this.key) return; localStorage.setItem('md_acct_' + this.key, JSON.stringify(this.data()));
     if (CLOUD && this.reg && !localOnly) { clearTimeout(this._t); this._t = setTimeout(() => sb('POST', 'profiles', { id: this.priv, data: this.data(), updated_at: new Date().toISOString() }, 'resolution=merge-duplicates,return=minimal').catch(() => { }), 800); this.syncColor(); }
@@ -167,8 +167,8 @@ const LB = {
     const mine = { pid: ACCT.pub, name: CFG.name, color: CFG.color, v: ACCT.stats[k] || 0 };
     if (!CLOUD) return { live: false, rows: ACCT.reg ? [mine] : [] };
     try {
-      const r = await sb('GET', `profiles?select=id,name:data->cfg->>name,color:data->cfg->>color,v:data->stats->${k}&data->>reg=eq.true&order=data->stats->${k}.desc.nullslast&limit=25`);
-      const rows = (r || []).filter(x => x.name && +x.v > 0).map(x => ({ pid: x.id === ACCT.priv ? ACCT.pub : x.id, name: x.name, color: x.color, v: +x.v }));
+      const r = await sb('GET', `profiles?select=id,name:data->cfg->>name,color:data->cfg->>color,cfg:data->cfg,v:data->stats->${k}&data->>reg=eq.true&order=data->stats->${k}.desc.nullslast&limit=25`);
+      const rows = (r || []).filter(x => x.name && +x.v > 0).map(x => ({ pid: x.id === ACCT.priv ? ACCT.pub : x.id, name: x.name, color: x.color, look: x.cfg ? carLook(x.cfg) : null, v: +x.v }));
       const me = rows.find(x => x.pid === ACCT.pub); if (me) me.v = Math.max(me.v, mine.v);
       return { live: true, rows: rows.sort((a, b) => b.v - a.v).slice(0, 20) };
     } catch (e) { return { live: false, err: true, rows: ACCT.reg ? [mine] : [] }; }
@@ -178,7 +178,7 @@ const LB = {
     if (CLOUD) { try { tops = await Promise.all(T.map(i => sb('GET', `laps?track=eq.${i}&select=pid,name,color,lap_ms&order=lap_ms.asc&limit=1`).then(r => r && r[0] ? { pid: r[0].pid, name: r[0].name, color: r[0].color } : null))); } catch (e) { live = false; err = true; } }
     if (!tops) tops = T.map(i => { const r = this.localGet(i).slice().sort((x, y) => x.lap - y.lap)[0]; return r ? { pid: r.pid, name: r.name, color: r.color } : null; });
     tops.forEach((r, j) => { if (!r) return; const e = by[r.pid] || (by[r.pid] = { pid: r.pid, name: r.name, color: r.color, n: 0, tracks: [] }); e.n++; e.tracks.push(TRACKS[T[j]].name); });
-    return { live, err, rows: Object.values(by).sort((x, y) => y.n - x.n || x.name.localeCompare(y.name)).slice(0, 20) };
+    const rows = Object.values(by).sort((x, y) => y.n - x.n || x.name.localeCompare(y.name)).slice(0, 20); await lbLooks(rows); return { live, err, rows };
   },
   async top(tr) {
     if (!CLOUD) return { live: false, rows: this.localGet(tr).slice(0, 10) };
@@ -191,7 +191,7 @@ const LB = {
         if (!P[tr] && !bad) this.queue(tr, { pid: ACCT.pub, lap: mine, score: 0 });
         const me = { pid: ACCT.pub, name: CFG.name, color: CFG.color, body: CFG.body, lap: mine, at: Date.now(), pending: !bad, failed: bad ? rj.why : '' };
         const i = rows.indexOf(srv); if (i >= 0) rows.splice(i, 1); rows.push(me); rows.sort((a, b) => a.lap - b.lap); }
-      return { live: true, rows: rows.slice(0, 10) };
+      await lbLooks(rows.slice(0, 10)); return { live: true, rows: rows.slice(0, 10) };
     } catch (e) { return { live: false, err: true, rows: this.localGet(tr).slice(0, 10) }; }
   },
 };
@@ -204,3 +204,14 @@ async function loadTweaks() {
     TWEAKS = t; if (G.me) G.me.tw = TWEAKS; } catch (e) { }
 }
 setInterval(loadTweaks, 15000);
+
+// players' current car (paint, body, livery...) from their saved profile, so leaderboards never show an old colour
+const LOOKS = {}; let LOOKS_T = 0;
+async function lbLooks(rows) {
+  if (!CLOUD || !rows) return; if (Date.now() - LOOKS_T > 60000) { for (const k in LOOKS) delete LOOKS[k]; LOOKS_T = Date.now(); }
+  const need = [...new Set(rows.map(r => r && r.pid).filter(p => p && p !== ACCT.pub && !(p in LOOKS)))]; if (!need.length) return;
+  try {
+    const r = await Promise.race([sb('GET', 'profiles?select=pub:data->>pub,cfg:data->cfg&data->>pub=in.(' + need.map(p => encodeURIComponent('"' + p + '"')).join(',') + ')'), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 3500))]);
+    for (const p of need) LOOKS[p] = null; for (const x of r || []) if (x && x.pub && x.cfg) LOOKS[x.pub] = carLook(x.cfg);
+  } catch (e) { }
+}

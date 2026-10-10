@@ -40,14 +40,19 @@ async function loadLB() {
   $('lbHead').innerHTML = res.live ? '<span class="live"></span> Live · global · fastest lap per driver' : (res.err ? '⚠ Leaderboard server unreachable · showing this device' : 'This device · fastest lap per account') + ` · ${TRACKS[LBT].name}`;
   const best = res.rows[0] ? res.rows[0].lap : 0;
   clearTimeout(LBPOLL); if (res.rows.some(x => x.pending)) LBPOLL = setTimeout(() => { if (TAB === 'lb' && G.state === 'menu') { LB.flush(); loadLB(); } }, 3000);
-  $('lbTable').innerHTML = '<tr><th>POS</th><th>DRIVER</th><th>TIME</th><th>GAP</th><th>DATE SET</th><th></th></tr>' + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td><i style="background:${esc(liveCol(x))}"></i>${esc(x.name)}${i === 0 ? ' <small class="wrtag">WR</small>' : ''}${x.pending ? ' <small style="color:#ff9a2a">· uploading</small>' : ''}${x.failed ? ` <small style="color:#ff5a5a" title="${esc(x.failed)}">· not uploaded (hover for why)</small>` : ''}</td><td>${fmt(x.lap)}</td><td>${i ? '+' + ((x.lap - best) / 1000).toFixed(3) : '—'}</td><td>${x.at ? new Date(x.at).toLocaleDateString() : ''}</td><td><button class="btn dark sm" data-watch="${i}" title="Watch this lap with replay cameras">Watch</button> <button class="btn dark sm" data-ghost="${i}" title="Race this lap's ghost in Time trial">Race against ghost</button></td></tr>`).join('') : '<tr><td colspan="6" style="color:#8b8b93;padding:22px">No laps yet. Set one in Time trial.</td></tr>'); LBROWS = res.rows; $('lbTable').querySelectorAll('[data-ghost]').forEach(b => b.onclick = () => raceGhost(LBT, LBROWS[+b.dataset.ghost], b));
+  $('lbTable').innerHTML = '<tr><th>POS</th><th>DRIVER</th><th>TIME</th><th>GAP</th><th>DATE SET</th><th></th></tr>' + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td>${lbCarHtml(x)}${esc(x.name)}${i === 0 ? ' <small class="wrtag">WR</small>' : ''}${x.pending ? ' <small style="color:#ff9a2a">· uploading</small>' : ''}${x.failed ? ` <small style="color:#ff5a5a" title="${esc(x.failed)}">· not uploaded (hover for why)</small>` : ''}</td><td>${fmt(x.lap)}</td><td>${i ? '+' + ((x.lap - best) / 1000).toFixed(3) : '—'}</td><td>${x.at ? new Date(x.at).toLocaleDateString() : ''}</td><td><button class="btn dark sm" data-watch="${i}" title="Watch this lap with replay cameras">Watch</button> <button class="btn dark sm" data-ghost="${i}" title="Race this lap's ghost in Time trial">Race against ghost</button></td></tr>`).join('') : '<tr><td colspan="6" style="color:#8b8b93;padding:22px">No laps yet. Set one in Time trial.</td></tr>'); LBROWS = res.rows; $('lbTable').querySelectorAll('[data-ghost]').forEach(b => b.onclick = () => raceGhost(LBT, LBROWS[+b.dataset.ghost], b));
 }
 // your own rows always show your current paint, other drivers' colour is kept in sync by the server (set_color)
-function liveCol(x) { return (x.pid === ACCT.pub ? CFG.color : x.color) || '#888'; }
+function lookOf(x) { x = x || {}; if (x.pid === ACCT.pub) return carLook(CFG); const L = (typeof LOOKS !== 'undefined' && LOOKS[x.pid]) || x.look; return L ? carLook(L) : carLook({ color: x.color || '#888888', body: x.body }); }
+function liveCol(x) { return lookOf(x).color || '#888'; }
+// little picture of the driver's actual car (with their customisation) in leaderboard rows
+let LBC = [], LBCq = false;
+function lbCarHtml(x) { LBC.push(lookOf(x)); if (!LBCq) { LBCq = true; Promise.resolve().then(drawLbCars); } return `<canvas class="lbcar" width="96" height="60" data-lc="${LBC.length - 1}"></canvas>`; }
+function drawLbCars() { LBCq = false; const L = LBC; LBC = []; document.querySelectorAll('canvas[data-lc]').forEach(c => { const k = L[+c.dataset.lc]; c.removeAttribute('data-lc'); if (k) try { drawCarPreview(c, k, -0.35); } catch (e) { } }); }
 async function loadWR() {
   const my = ++LBSEQ, res = await LB.wrs(); if (my !== LBSEQ) return;
   $('lbHead').innerHTML = (res.live ? '<span class="live"></span> Live · global' : (res.err ? '⚠ Leaderboard server unreachable · showing this device' : 'This device')) + ' · world records held across all tracks';
-  $('lbTable').innerHTML = '<tr><th>POS</th><th>DRIVER</th><th>WRS</th><th>TRACKS</th></tr>' + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td><i style="background:${esc(liveCol(x))}"></i>${esc(x.name)}</td><td><b>${x.n}</b></td><td style="color:#a9a9b3">${x.tracks.map(esc).join(', ')}</td></tr>`).join('') : '<tr><td colspan="4" style="color:#8b8b93;padding:22px">No world records yet. Set a lap in Time trial.</td></tr>');
+  $('lbTable').innerHTML = '<tr><th>POS</th><th>DRIVER</th><th>WRS</th><th>TRACKS</th></tr>' + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td>${lbCarHtml(x)}${esc(x.name)}</td><td><b>${x.n}</b></td><td style="color:#a9a9b3">${x.tracks.map(esc).join(', ')}</td></tr>`).join('') : '<tr><td colspan="4" style="color:#8b8b93;padding:22px">No world records yet. Set a lap in Time trial.</td></tr>');
 }
 function refreshAcct() {
   if (!ACCT.key) return; $('acctOut').classList.toggle('hidden', ACCT.reg); $('acctIn').classList.toggle('hidden', !ACCT.reg);
@@ -234,7 +239,7 @@ async function raceGhost(tr, row, btn) {
   if (!decRep(rep) && row.pid === ACCT.pub) rep = localStorage.getItem('md_rep_' + tr);
   if (btn) btn.textContent = 'Race against ghost';
   if (!decRep(rep)) return alert('There is no ghost for this lap yet. Ghosts are saved with new personal bests from now on.');
-  G.ghostPick = { rep, name: row.name, color: liveCol(row), body: row.body, wr: row === LBROWS[0], own: row.pid === ACCT.pub }; CFG.track = tr; G.plist = []; startSession({ track: tr, laps: 0, mode: 'tt' }, null, false);
+  G.ghostPick = Object.assign(lookOf(row), { rep, name: row.name, color: liveCol(row), wr: row === LBROWS[0], own: row.pid === ACCT.pub }); CFG.track = tr; G.plist = []; startSession({ track: tr, laps: 0, mode: 'tt' }, null, false);
 }
 
 // ===== custom dropdowns: replaces the browser's native <select> look, keeps the real select underneath =====
@@ -335,5 +340,5 @@ netSwUI();
 async function loadStatLB(k) {
   const my = ++LBSEQ, res = await LB.stat(k); if (my !== LBSEQ) return;
   $('lbHead').innerHTML = (res.live ? '<span class="live"></span> Live · global' : (res.err ? '⚠ Leaderboard server unreachable · showing you' : 'This device')) + (k === 'dist' ? ' · total distance driven' : ' · total drift points scored');
-  $('lbTable').innerHTML = `<tr><th>POS</th><th>DRIVER</th><th>${k === 'dist' ? 'DISTANCE' : 'DRIFT POINTS'}</th></tr>` + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td><i style="background:${esc(liveCol(x))}"></i>${esc(x.name)}</td><td><b>${k === 'dist' ? (+x.v || 0).toFixed(1) + ' km' : Math.round(+x.v || 0).toLocaleString()}</b></td></tr>`).join('') : '<tr><td colspan="3" style="color:#8b8b93;padding:22px">Nobody yet. Get driving!</td></tr>');
+  $('lbTable').innerHTML = `<tr><th>POS</th><th>DRIVER</th><th>${k === 'dist' ? 'DISTANCE' : 'DRIFT POINTS'}</th></tr>` + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td>${lbCarHtml(x)}${esc(x.name)}</td><td><b>${k === 'dist' ? (+x.v || 0).toFixed(1) + ' km' : Math.round(+x.v || 0).toLocaleString()}</b></td></tr>`).join('') : '<tr><td colspan="3" style="color:#8b8b93;padding:22px">Nobody yet. Get driving!</td></tr>');
 }

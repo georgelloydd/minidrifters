@@ -182,7 +182,7 @@ function applySpawn(c) {
 function setGhost(rep, pick) {
   const L = decRep(rep); G.ghost = L; G.ghostCar = null; if (!L) return;
   const gc = newCar(0, G.tr, 'ghost', !pick || pick.own ? 'PB' : pick.name + (pick.wr ? ' [WR]' : ''), (pick && pick.color) || CFG.color);
-  Object.assign(gc, carLook(pick && !pick.own ? { name: pick.name, color: pick.color || '#888888', body: pick.body } : CFG)); gc.finished = 1; gc.own = !pick; G.ghostCar = gc;
+  Object.assign(gc, carLook(pick && !pick.own ? pick : CFG)); gc.finished = 1; gc.own = !pick; G.ghostCar = gc;
 }
 function ghostCars() {
   const gc = G.ghostCar, L = G.ghost, me = G.me; if (!gc || !L || G.state !== 'race' || !me || me.lap < 0 || me.finished) return [];

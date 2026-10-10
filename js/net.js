@@ -44,6 +44,7 @@ function hostData(c, d) {
   if (!d || typeof d !== 'object') return;
   if (d.t === 'hello') {
     if (NET.inRace) { c.send({ t: 'busy', msg: 'A race is in progress. Try again when it finishes.' }); setTimeout(() => c.close(), 500); return; }
+    if (NET.players.size >= MAX_GRID && !NET.players.has(c.peer)) { c.send({ t: 'busy', msg: 'This lobby is full (' + MAX_GRID + ' drivers max).' }); setTimeout(() => c.close(), 500); return; }
     const pid = String(d.pid || '').slice(0, 40);
     if (pid && (pid === myPid() || [...NET.players.values()].some(p => p.pid === pid && p.id !== c.peer))) { c.send({ t: 'busy', msg: 'You are already in this lobby in another tab or window.' }); setTimeout(() => c.close(), 500); return; }
     NET.conns.set(c.peer, c); NET.players.set(c.peer, Object.assign({ id: c.peer, name: String(d.name || 'Driver').slice(0, 14), pid }, carLook(d)));
