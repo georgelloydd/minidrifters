@@ -10,4 +10,10 @@
       <image:loc>https://georgelloydd.github.io/minidrifters/icon-512.png</image:loc>
     </image:image>
   </url>
+  <url>
+    <loc>https://georgelloydd.github.io/minidrifters/build/</loc>
+    <lastmod>2026-10-11</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>
 </urlset>

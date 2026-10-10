@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Mini Drifters</title>
+<meta name="description" content="Design your own Mini Drifters track and submit it to be added to the game.">
+<link rel="canonical" href="https://georgelloydd.github.io/minidrifters/build/">
+<link rel="icon" href="../favicon.ico" sizes="any"><link rel="icon" type="image/svg+xml" href="../favicon.svg"><link rel="apple-touch-icon" href="../apple-touch-icon.png">
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:#0d0d10;color:#eee;font-family:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;overflow:hidden}
+header{position:fixed;top:0;left:0;right:0;height:56px;display:flex;align-items:center;gap:14px;padding:0 16px;background:rgba(10,10,12,.92);border-bottom:1px solid #222;z-index:5}
+.logo{font-weight:900;font-style:italic;font-size:22px;letter-spacing:1px;color:#fff;text-decoration:none}.logo small{color:#ff3b3b;font-size:13px;margin-right:4px}
+.tag{color:#ff3b3b;font-weight:900;font-style:italic;letter-spacing:2px;font-size:12px;text-transform:uppercase}
+#cv{position:fixed;left:0;top:56px;width:calc(100% - 320px);height:calc(100% - 56px);touch-action:none;cursor:crosshair}
+aside{position:fixed;right:0;top:56px;bottom:0;width:320px;background:#141417;border-left:1px solid #222;padding:16px;overflow:auto;z-index:4}
+label{display:block;font-size:11px;font-weight:900;letter-spacing:1.5px;text-transform:uppercase;color:#999;margin:14px 0 6px}
+input[type=text],select{width:100%;background:#0d0d10;color:#fff;border:1px solid #333;border-radius:8px;padding:9px 10px;font:inherit}input[type=range]{width:100%;accent-color:#ff3b3b}
+.btn{display:inline-block;background:#26262b;color:#fff;border:1px solid #333;border-radius:8px;padding:9px 12px;font:italic 900 12px 'Segoe UI',system-ui,sans-serif;letter-spacing:1.2px;text-transform:uppercase;cursor:pointer;text-decoration:none}.btn:hover{border-color:#ff3b3b}.btn.red{background:#ff3b3b;border-color:#ff3b3b}.btn:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:6px;flex-wrap:wrap}.dim{color:#999;font-size:13px;line-height:1.45}.msg{margin-top:10px;font-size:13px;min-height:18px}.ok{color:#7bff4a}.err{color:#ff6a6a}
+.sub{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid #222;font-size:13px}.st{font-weight:900;font-size:11px;text-transform:uppercase;letter-spacing:1px}.st.pending{color:#ffb84a}.st.approved{color:#7bff4a}.st.rejected{color:#ff6a6a}
+@media (max-width:800px){#cv{width:100%;height:55%}aside{top:auto;left:0;width:100%;height:calc(45% - 56px);border-left:0;border-top:1px solid #222}}
+</style></head><body>
+<header><a class="logo" href="../"><small>MINI</small>DRIFTERS</a><span class="tag">Track builder</span><a class="btn" href="../" style="margin-left:auto">Back to game</a></header>
+<canvas id="cv"></canvas>
+<aside>
+  <p class="dim"><b>Click</b> to add corners (clicking near the track inserts one there). <b>Drag</b> corners to move them. <b>Double-click</b> or long-press a corner to delete it. Scroll or pinch to zoom, right-drag to pan.</p>
+  <label>Track name</label><input type="text" id="nm" maxlength="40" placeholder="My awesome track">
+  <label>Width <span id="wv"></span></label><input type="range" id="wd" min="120" max="260" step="5">
+  <label>Theme</label><select id="th"></select>
+  <label>Start from a shape</label><div class="row"><button class="btn" data-sh="oval">Oval</button><button class="btn" data-sh="rect">Rectangle</button><button class="btn" data-sh="clear">Clear</button></div>
+  <label>Edit</label><div class="row"><button class="btn" id="undo">Undo</button><button class="btn" id="rev">Reverse direction</button><button class="btn" id="fit">Fit view</button></div>
+  <label>Submit</label><p class="dim" id="acc"></p>
+  <button class="btn red" id="send" style="width:100%">Submit for review</button><div class="msg" id="msg"></div>
+  <label>My submissions</label><div id="mine" class="dim">None yet.</div>
+</aside>
+<script src="../js/config.js"></script>
+<script>
+const $ = id => document.getElementById(id), R4 = v => Math.round(v * 1e4) / 1e4, WW = 4400, WH = 3200;
+const THEMES = {
+  City: { grass: '#8b9097', grass2: '#959aa1', road: '#2f3136', sand: '#b4b7bb', tree: ['#3f6b35', '#4f8442'], scene: 'city' },
+  'City night': { grass: '#22252d', grass2: '#282c35', road: '#1d1e22', sand: '#3a3e48', tree: ['#1f4f3a', '#2b6a4c'], night: true, scene: 'city' },
+  Forest: { grass: '#2f5e2a', grass2: '#376b31', road: '#36383d', sand: '#8a7a55', tree: ['#1d4a1f', '#2a6229'] },
+  Coast: { grass: '#e3d3a0', grass2: '#ead9a8', road: '#3c3e44', sand: '#f1e4bc', tree: ['#3f8a5a', '#55a66d'] },
+  Canyon: { grass: '#c27a4a', grass2: '#cc8656', road: '#46392f', sand: '#d9a273', tree: ['#7a8a3a', '#93a34a'], scene: 'desert' },
+  Sunset: { grass: '#4c8c3c', grass2: '#5a9c47', road: '#3a3c42', sand: '#d8c48f', tree: ['#2f6e2a', '#3f8a35'] },
+  'Neon night': { grass: '#2b3346', grass2: '#323b52', road: '#26272d', sand: '#4a5068', tree: ['#1f6f8b', '#2d8fb0'], night: true },
+  Snow: { grass: '#dfe8ef', grass2: '#eef3f7', road: '#4a4d55', sand: '#b9c6d2', tree: ['#2c5a3f', '#3c7452'], snow: true },
+  Desert: { grass: '#d9b878', grass2: '#e2c58c', road: '#4a4038', sand: '#c79a5a', tree: ['#7a8a3a', '#93a34a'], scene: 'desert' },
+  'Autumn': { grass: '#7a6a2e', grass2: '#8a7a38', road: '#3b3a3c', sand: '#c9a46a', tree: ['#b5541c', '#d9822b'] },
+  'Red night': { grass: '#1b1214', grass2: '#22171a', road: '#232327', sand: '#3a2226', tree: ['#7a1420', '#a81c2c'], night: true },
+};
+const CLOUD = !!(ONLINE.SUPABASE_URL && ONLINE.SUPABASE_ANON_KEY), KEY = localStorage.getItem('md_key') || '';
+let T = null; try { T = JSON.parse(localStorage.getItem('md_build_draft') || 'null'); } catch (e) { }
+if (!T || !Array.isArray(T.pts)) T = { name: '', width: 170, theme: 'Sunset', pts: shape('oval') };
+const V = { s: 0.2, x: 0, y: 0 }, UNDO = []; let drag = null, hover = -1;
+const cv = $('cv'), ctx = cv.getContext('2d');
+function shape(k) {
+  if (k === 'clear') return [];
+  if (k === 'rect') return [[.2, .22], [.5, .2], [.8, .22], [.82, .5], [.8, .78], [.5, .8], [.2, .78], [.18, .5]];
+  return Array.from({ length: 12 }, (_, i) => { const a = i / 12 * Math.PI * 2; return [R4(.5 + Math.cos(a) * .34), R4(.5 + Math.sin(a) * .3)]; });
+}
+function save() { try { localStorage.setItem('md_build_draft', JSON.stringify(T)); } catch (e) { } }
+function snap() { UNDO.push(JSON.stringify(T.pts)); if (UNDO.length > 80) UNDO.shift(); }
+function spline(P, seg = 10) { const n = P.length, out = []; if (n < 3) return P.map(p => [p[0] * WW, p[1] * WH]); for (let i = 0; i < n; i++) { const p0 = P[(i - 1 + n) % n], p1 = P[i], p2 = P[(i + 1) % n], p3 = P[(i + 2) % n]; for (let k = 0; k < seg; k++) { const t = k / seg, t2 = t * t, t3 = t2 * t, f = (a, b, c, d) => 0.5 * (2 * b + (c - a) * t + (2 * a - 5 * b + 4 * c - d) * t2 + (3 * b - a - 3 * c + d) * t3); out.push([f(p0[0], p1[0], p2[0], p3[0]) * WW, f(p0[1], p1[1], p2[1], p3[1]) * WH]); } } return out; }
+function resize() { const r = cv.getBoundingClientRect(), d = devicePixelRatio || 1; cv.width = r.width * d; cv.height = r.height * d; draw(); }
+function fit() { const r = cv.getBoundingClientRect(); V.s = Math.min(r.width / WW, r.height / WH) * 0.94; V.x = (r.width - WW * V.s) / 2; V.y = (r.height - WH * V.s) / 2; draw(); }
+const toW = (x, y) => [(x - V.x) / V.s, (y - V.y) / V.s];
+function draw() {
+  const d = devicePixelRatio || 1, th = THEMES[T.theme] || THEMES.Sunset; ctx.setTransform(d, 0, 0, d, 0, 0); ctx.fillStyle = '#0d0d10'; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.save(); ctx.translate(V.x, V.y); ctx.scale(V.s, V.s); ctx.fillStyle = th.grass; ctx.fillRect(0, 0, WW, WH); ctx.strokeStyle = th.grass2; ctx.lineWidth = 2 / V.s; for (let x = 0; x <= WW; x += 400) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WH); ctx.stroke(); } for (let y = 0; y <= WH; y += 400) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WW, y); ctx.stroke(); }
+  const S = spline(T.pts); if (S.length > 2) { const path = () => { ctx.beginPath(); S.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); }; ctx.lineJoin = 'round'; path(); ctx.strokeStyle = th.sand; ctx.lineWidth = T.width + 110; ctx.stroke(); path(); ctx.strokeStyle = '#e8e8e8'; ctx.lineWidth = T.width + 12; ctx.stroke(); path(); ctx.strokeStyle = th.road; ctx.lineWidth = T.width; ctx.stroke(); ctx.setLineDash([40, 40]); path(); ctx.strokeStyle = 'rgba(255,255,255,.25)'; ctx.lineWidth = 5; ctx.stroke(); ctx.setLineDash([]);
+    const a = S[0], b = S[1], an = Math.atan2(b[1] - a[1], b[0] - a[0]); ctx.save(); ctx.translate(a[0], a[1]); ctx.rotate(an); for (let i = -T.width / 2; i < T.width / 2; i += 20) for (let j = 0; j < 2; j++) { ctx.fillStyle = (Math.round(i / 20) + j) % 2 ? '#fff' : '#111'; ctx.fillRect(j * 20 - 20, i, 20, 20); } ctx.fillStyle = '#ff3b3b'; ctx.beginPath(); ctx.moveTo(90, -30); ctx.lineTo(150, 0); ctx.lineTo(90, 30); ctx.fill(); ctx.restore(); }
+  T.pts.forEach((p, i) => { ctx.beginPath(); ctx.arc(p[0] * WW, p[1] * WH, (i === hover ? 34 : 26), 0, 7); ctx.fillStyle = i === 0 ? '#ff3b3b' : '#fff'; ctx.fill(); ctx.lineWidth = 6; ctx.strokeStyle = '#111'; ctx.stroke(); });
+  ctx.restore(); $('wv').textContent = T.width; validate();
+}
+function near(w) { const r = 40 / V.s; let bi = -1, bd = r; T.pts.forEach((p, i) => { const d = Math.hypot(p[0] * WW - w[0], p[1] * WH - w[1]); if (d < bd) { bd = d; bi = i; } }); return bi; }
+const clampP = w => [R4(Math.max(0.02, Math.min(.98, w[0] / WW))), R4(Math.max(0.02, Math.min(.98, w[1] / WH)))];
+function insertAt(w) { const n = T.pts.length, p = clampP(w); if (n < 3) { T.pts.push(p); return; } let bi = n - 1, bd = Infinity; for (let i = 0; i < n; i++) { const a = T.pts[i], b = T.pts[(i + 1) % n], ax = a[0] * WW, ay = a[1] * WH, bx = b[0] * WW, by = b[1] * WH, L = (bx - ax) ** 2 + (by - ay) ** 2 || 1, t = Math.max(0, Math.min(1, ((w[0] - ax) * (bx - ax) + (w[1] - ay) * (by - ay)) / L)), d = Math.hypot(ax + (bx - ax) * t - w[0], ay + (by - ay) * t - w[1]); if (d < bd) { bd = d; bi = i; } } T.pts.splice(bi + 1, 0, p); }
+const PT = new Map(); let pinch = null, pan = null, lp = null;
+cv.addEventListener('pointerdown', e => { cv.setPointerCapture(e.pointerId); PT.set(e.pointerId, [e.offsetX, e.offsetY]); if (PT.size === 2) { drag = null; clearTimeout(lp); const [a, b] = [...PT.values()]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), s: V.s, cx: (a[0] + b[0]) / 2, cy: (a[1] + b[1]) / 2, vx: V.x, vy: V.y }; return; } if (e.button === 2 || e.button === 1) { pan = [e.offsetX - V.x, e.offsetY - V.y]; return; } const w = toW(e.offsetX, e.offsetY), i = near(w); snap(); if (i >= 0) { drag = i; lp = setTimeout(() => { if (drag === i && T.pts.length > 3) { T.pts.splice(i, 1); drag = null; save(); draw(); } }, 650); } else { insertAt(w); drag = null; save(); draw(); } });
+cv.addEventListener('pointermove', e => { if (PT.has(e.pointerId)) PT.set(e.pointerId, [e.offsetX, e.offsetY]); if (pinch && PT.size === 2) { const [a, b] = [...PT.values()], d = Math.hypot(a[0] - b[0], a[1] - b[1]), cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2, ns = Math.max(0.05, Math.min(2, pinch.s * d / pinch.d)); V.x = cx - (pinch.cx - pinch.vx) * ns / pinch.s; V.y = cy - (pinch.cy - pinch.vy) * ns / pinch.s; V.s = ns; draw(); return; } if (pan) { V.x = e.offsetX - pan[0]; V.y = e.offsetY - pan[1]; draw(); return; } const w = toW(e.offsetX, e.offsetY); if (drag !== null) { clearTimeout(lp); T.pts[drag] = clampP(w); draw(); } else { const h = near(w); if (h !== hover) { hover = h; draw(); } } });
+const up = e => { PT.delete(e.pointerId); clearTimeout(lp); if (PT.size < 2) pinch = null; pan = null; if (drag !== null) save(); drag = null; };
+cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up); cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('dblclick', e => { const i = near(toW(e.offsetX, e.offsetY)); if (i >= 0 && T.pts.length > 3) { snap(); T.pts.splice(i, 1); save(); draw(); } });
+cv.addEventListener('wheel', e => { e.preventDefault(); const ns = Math.max(0.05, Math.min(2, V.s * (e.deltaY < 0 ? 1.12 : 1 / 1.12))); V.x = e.offsetX - (e.offsetX - V.x) * ns / V.s; V.y = e.offsetY - (e.offsetY - V.y) * ns / V.s; V.s = ns; draw(); }, { passive: false });
+$('th').innerHTML = Object.keys(THEMES).map(k => `<option>${k}</option>`).join(''); $('th').value = T.theme; $('nm').value = T.name; $('wd').value = T.width;
+$('th').onchange = () => { T.theme = $('th').value; save(); draw(); }; $('nm').oninput = () => { T.name = $('nm').value; save(); validate(); }; $('wd').oninput = () => { T.width = +$('wd').value; save(); draw(); };
+document.querySelectorAll('[data-sh]').forEach(b => b.onclick = () => { snap(); T.pts = shape(b.dataset.sh); save(); draw(); });
+$('undo').onclick = () => { const s = UNDO.pop(); if (s) { T.pts = JSON.parse(s); save(); draw(); } }; $('rev').onclick = () => { snap(); T.pts.reverse(); T.pts.unshift(T.pts.pop()); save(); draw(); }; $('fit').onclick = fit;
+addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); $('undo').click(); } });
+function problems() { const p = []; if (T.pts.length < 4) p.push('Add at least 4 corners.'); if (!T.name.trim()) p.push('Give your track a name.'); const S = spline(T.pts, 6), n = S.length; let len = 0; for (let i = 0; i < n; i++) len += Math.hypot(S[(i + 1) % n][0] - S[i][0], S[(i + 1) % n][1] - S[i][1]); if (T.pts.length >= 4 && len < 3500) p.push('The track is too short, spread the corners out.'); return p; }
+function validate() { const p = problems(); $('send').disabled = !!p.length || !CLOUD || !KEY; if (!$('msg').dataset.keep) { $('msg').className = 'msg ' + (p.length ? 'err' : ''); $('msg').textContent = p.join(' '); } }
+$('acc').innerHTML = !CLOUD ? 'Online services are not set up on this site yet, so tracks cannot be submitted.' : KEY ? 'Signed in on this device. Your track goes to the developer for review, and approved tracks get added to the game.' : 'You need an account to submit. <a href="../" style="color:#ff3b3b">Create one in the game</a> (Account tab), then come back.';
+async function rpc(fn, body) { const key = ONLINE.SUPABASE_ANON_KEY.trim(), h = { apikey: key, 'Content-Type': 'application/json' }; if (key.startsWith('eyJ')) h.Authorization = 'Bearer ' + key; const r = await fetch(ONLINE.SUPABASE_URL.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, '') + '/rest/v1/rpc/' + fn, { method: 'POST', headers: h, body: JSON.stringify(body) }); const t = await r.text(); let j = null; try { j = t ? JSON.parse(t) : null; } catch (e) { } if (!r.ok) throw new Error((j && (j.message || j.hint)) || ('HTTP ' + r.status)); return j; }
+$('send').onclick = async () => { const m = $('msg'); m.dataset.keep = 1; m.className = 'msg'; m.textContent = 'Sending…'; $('send').disabled = true;
+  const def = { name: T.name.trim().slice(0, 40), width: T.width, pts: T.pts.map(p => [R4(p[0]), R4(p[1])]), th: Object.assign({}, THEMES[T.theme] || THEMES.Sunset), theme: T.theme };
+  try { await rpc('submit_track', { p_key: KEY, p_name: def.name, p_def: def }); m.className = 'msg ok'; m.textContent = 'Submitted! The developer will review it soon.'; mine(); }
+  catch (e) { m.className = 'msg err'; m.textContent = /submit_track|PGRST202|404/.test(e.message) ? 'Track submissions are not switched on yet (the database setup needs updating).' : e.message; }
+  setTimeout(() => { delete m.dataset.keep; validate(); }, 6000); };
+async function mine() { if (!CLOUD || !KEY) return; try { const r = await rpc('my_submissions', { p_key: KEY }); $('mine').innerHTML = r && r.length ? r.map(s => `<div class="sub"><span>${String(s.name).replace(/[<>&]/g, '')}${s.note ? `<br><small class="dim">${String(s.note).replace(/[<>&]/g, '')}</small>` : ''}</span><span class="st ${s.status}">${s.status}</span></div>`).join('') : 'None yet.'; } catch (e) { } }
+addEventListener('resize', resize); resize(); fit(); mine();
+</script>
+</body></html>

@@ -12,13 +12,15 @@ function netNeedText() { return 'Multiplayer needs internet to load (PeerJS coul
 function sbListOn() { return typeof CLOUD !== 'undefined' && CLOUD && typeof supabase !== 'undefined'; }
 function listOn() { return srvOn() || sbListOn(); }
 function randCode() { const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let s = ''; for (let i = 0; i < 5; i++) s += A[Math.floor(Math.random() * A.length)]; return s; }
-function meInfo(me) { return Object.assign({ name: me.name }, carLook(me)); }
+// one id per player: their account id, or (guests) one id shared by every tab of this browser
+function myPid() { let d = ''; try { d = localStorage.getItem('md_dev_id') || ''; if (!d) { d = 'd' + Math.random().toString(36).slice(2, 12); localStorage.setItem('md_dev_id', d); } } catch (e) { } return (typeof ACCT !== 'undefined' && ACCT.pub) || d; }
+function meInfo(me) { return Object.assign({ name: me.name, pid: myPid() }, carLook(me)); }
 
-function netHost(me, cb) {
-  NET.code = randCode(); NET.host = true; NET.myId = 'host';
+function netHost(me, cb, code) {
+  NET.code = code || randCode(); NET.host = true; NET.myId = 'host';
   const peer = mkPeer(PREFIX + NET.code); NET.peer = peer; let opened = false;
   peer.on('open', () => { opened = true; NET.on = true; NET.players.clear(); NET.conns.clear(); NET.players.set('host', Object.assign({ id: 'host' }, meInfo(me))); cb(null); });
-  peer.on('error', e => { if (e.type === 'unavailable-id') { peer.destroy(); netHost(me, cb); } else if (!opened) cb(e); else if (e.type !== 'peer-unavailable') emit('neterror', e); });
+  peer.on('error', e => { if (e.type === 'unavailable-id') { peer.destroy(); if (!code) netHost(me, cb); else if ((netHost.tries = (netHost.tries || 0) + 1) < 10) setTimeout(() => netHost(me, cb, code), 1500); else cb(e); } else if (!opened) cb(e); else if (e.type !== 'peer-unavailable') emit('neterror', e); });
   peer.on('disconnected', () => { try { if (NET.on && NET.peer === peer) peer.reconnect(); } catch (e) { } });
   peer.on('connection', c => {
     c.on('data', d => hostData(c, d));
@@ -26,15 +28,15 @@ function netHost(me, cb) {
   });
 }
 function netJoin(code, me, cb) {
-  NET.host = false; NET.code = code.toUpperCase().trim(); let done = false;
+  NET.host = false; NET.code = code.toUpperCase().trim(); NET.me = me; let done = false;
   const finish = e => { if (!done) { done = true; cb(e); } };
   const peer = mkPeer(); NET.peer = peer;
   peer.on('open', id => {
     NET.myId = id; const c = peer.connect(PREFIX + NET.code, { reliable: true, serialization: 'json' }); NET.hc = c;
     const to = setTimeout(() => finish({ type: 'timeout' }), 12000);
     c.on('open', () => { clearTimeout(to); c.send(Object.assign({ t: 'hello' }, meInfo(me))); NET.on = true; finish(null); });
-    c.on('data', d => { if (NET.hc === c) emit(d.t, d); });
-    c.on('close', () => { if (NET.hc !== c) return; if (NET.on) emit('hostgone'); NET.on = false; });
+    c.on('data', d => { if (NET.hc !== c || !d) return; if (d.t === 'welcome') NET.myId = d.id; else if (d.t === 'lobby') { NET.order = (d.players || []).map(p => p.id); NET.lobbyP = d.players || []; NET.lastCfg = d.cfg; } else if (d.t === 'busy') NET.on = false; emit(d.t, d); });
+    c.on('close', () => { if (NET.hc !== c) return; const was = NET.on; NET.on = false; if (was) netMigrate(); });
   });
   peer.on('error', e => { if (!done) finish(e); else if (e.type !== 'peer-unavailable') emit('neterror', e); });
 }
@@ -42,12 +44,31 @@ function hostData(c, d) {
   if (!d || typeof d !== 'object') return;
   if (d.t === 'hello') {
     if (NET.inRace) { c.send({ t: 'busy', msg: 'A race is in progress. Try again when it finishes.' }); setTimeout(() => c.close(), 500); return; }
-    NET.conns.set(c.peer, c); NET.players.set(c.peer, Object.assign({ id: c.peer, name: String(d.name || 'Driver').slice(0, 14) }, carLook(d)));
+    const pid = String(d.pid || '').slice(0, 40);
+    if (pid && (pid === myPid() || [...NET.players.values()].some(p => p.pid === pid && p.id !== c.peer))) { c.send({ t: 'busy', msg: 'You are already in this lobby in another tab or window.' }); setTimeout(() => c.close(), 500); return; }
+    NET.conns.set(c.peer, c); NET.players.set(c.peer, Object.assign({ id: c.peer, name: String(d.name || 'Driver').slice(0, 14), pid }, carLook(d)));
     c.send({ t: 'welcome', id: c.peer }); emit('joined', c.peer); netLobby();
   } else if (!NET.players.has(c.peer)) return;
   else if (d.t === 'st') { const p = NET.players.get(c.peer); p.s = d.s; emit('st', { id: c.peer, s: d.s }); }
   else if (d.t === 'fin') { emit('fin', { id: c.peer, time: d.time, score: d.score, laps: d.laps, rid: d.rid }); }
   else if (d.t === 'info') { const p = NET.players.get(c.peer); p.name = String(d.name || p.name).slice(0, 14); netLobby(); }
+}
+// host left: the next player to have joined takes over the room (same code), everyone else reconnects to them
+function netMigrate() {
+  const code = NET.code, me = NET.me, order = (NET.order || []).filter(id => id !== 'host');
+  if (!code || !me || !order.length) return emit('hostgone');
+  const succ = order[0], name = ((NET.lobbyP || []).find(p => p.id === succ) || {}).name || 'The next player';
+  try { if (NET.peer) NET.peer.destroy(); } catch (e) { }
+  NET.peer = null; NET.hc = null; NET.inRace = false; NET.conns.clear(); NET.players.clear(); NET.code = code;
+  if (succ === NET.myId) {
+    const c = NET.lastCfg || {}; for (const k of ['track', 'laps', 'mode', 'wx']) if (c[k] !== undefined) CFG[k] = c[k];
+    emit('migrating', { me: true, name }); netHost.tries = 0;
+    setTimeout(() => netHost(me, e => { if (e) { netLeave(); emit('hostgone'); } else emit('migrated', { host: true }); }, code), 600);
+  } else {
+    emit('migrating', { me: false, name }); let n = 0;
+    const tryJoin = () => netJoin(code, me, e => { if (!e) return emit('migrated', { host: false, name }); try { if (NET.peer) NET.peer.destroy(); } catch (x) { } NET.peer = null; if (++n < 10) setTimeout(tryJoin, 1500); else { netLeave(); emit('hostgone'); } });
+    setTimeout(tryJoin, 1800);
+  }
 }
 function netSend(m) { if (!NET.on) return; if (NET.host && NET.peer && NET.peer.bcast) { NET.peer.bcast(m); return; } if (NET.host) { for (const c of NET.conns.values()) if (c.open) try { c.send(m); } catch (e) { } } else if (NET.hc && NET.hc.open) NET.hc.send(m); }
 function netLobby() { if (!NET.host) return; const m = { t: 'lobby', players: [...NET.players.values()].map(p => Object.assign({ id: p.id, name: p.name }, carLook(p))), cfg: emitCfg() }; netSend(m); emit('lobby', m); rtListServer(); }

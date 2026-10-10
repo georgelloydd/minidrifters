@@ -11,7 +11,7 @@ const CAR_TYPES = [
 ];
 const LIVERIES = [
   { id: 'clean', name: 'Clean' }, { id: 'stripe', name: 'Stripe' }, { id: 'racing', name: 'Racing' },
-  { id: 'checker', name: 'Checker' }, { id: 'carbon', name: 'Carbon' }, { id: 'flame', name: 'Flame' }, { id: 'camo', name: 'Camo' },
+  { id: 'checker', name: 'Checker' }, { id: 'carbon', name: 'Carbon' }, { id: 'flame', name: 'Flame' }, { id: 'camo', name: 'Camo' }, { id: 'split', name: 'Split' }, { id: 'fade', name: 'Fade' },
 ];
 const FINISHES = [['gloss', 'Gloss'], ['matte', 'Matte'], ['metal', 'Metallic'], ['pearl', 'Pearl']];
 const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
@@ -19,14 +19,14 @@ function mixHex(a, b, t) { const p = h => [1, 3, 5].map(i => parseInt(h.slice(i,
 function rgba(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${n >> 16},${(n >> 8) & 255},${n & 255},${a})`; }
 const LOOK_DEF = { color: '#ff3b3b', accent: '#ffffff', accent2: '#111111', rim: '#c9ccd2', finish: 'gloss', num: '7', livery: 'racing', body: 'drift' };
 // liveries from the short-lived redesign map back onto the classic ones
-const OLD_LV = { centre: 'stripe', stripes: 'racing', side: 'racing', chevron: 'stripe', split: 'clean', fade: 'clean', number: 'clean' };
+const OLD_LV = { centre: 'stripe', stripes: 'racing', side: 'racing', chevron: 'stripe', number: 'clean' };
 function carType(id) { return CAR_TYPES.find(t => t.id === id) || CAR_TYPES[0]; }
 
 // Sanitised cosmetic settings (also used for other players' cars received over the network)
 function carLook(o) {
   o = o || {}; const lv = OLD_LV[o.livery] || o.livery;
   return { body: carType(o.body).id, color: isHex(o.color) ? o.color : LOOK_DEF.color, accent: isHex(o.accent) ? o.accent : LOOK_DEF.accent, accent2: isHex(o.accent2) ? o.accent2 : LOOK_DEF.accent2,
-    rim: isHex(o.rim) ? o.rim : LOOK_DEF.rim, finish: FINISHES.some(f => f[0] === o.finish) ? o.finish : 'gloss', num: String(o.num === undefined ? LOOK_DEF.num : o.num).replace(/\D/g, '').slice(0, 2), livery: LIVERIES.some(l => l.id === lv) ? lv : 'clean' };
+    rim: isHex(o.rim) ? o.rim : LOOK_DEF.rim, finish: FINISHES.some(f => f[0] === o.finish) ? o.finish : 'gloss', num: String(o.num === undefined ? LOOK_DEF.num : o.num).replace(/\D/g, '').slice(0, 2), livery: LIVERIES.some(l => l.id === lv) ? lv : 'clean', glow: isHex(o.glow) ? o.glow : '', smoke: isHex(o.smoke) ? o.smoke : '' };
 }
 
 function bodyPath(g, id, L, W) {
@@ -41,12 +41,17 @@ function bodyPath(g, id, L, W) {
 
 function drawLivery(g, lv, col, L, W, id, a1, a2) {
   a1 = a1 || '#f4f4f4'; a2 = a2 || '#111111'; const h = L / 2, w = W / 2;
-  if (lv === 'stripe') { g.fillStyle = a1; g.fillRect(-h, -3, L, 6); }
-  else if (lv === 'racing') { g.fillStyle = a1; g.fillRect(-h, -6, L, 4); g.fillRect(-h, 2, L, 4); }
-  else if (lv === 'checker') { const s = 5; for (let x = -h + L * 0.15; x < -h + L * 0.4; x += s) for (let y = -w; y < w; y += s) { g.fillStyle = ((Math.round((x + h) / s) + Math.round((y + w) / s)) % 2) ? a2 : a1; g.fillRect(x, y, s, s); } }
-  else if (lv === 'carbon') { g.fillStyle = rgba(mixHex(a2, '#0f0f12', 0.6), 0.82); g.fillRect(-h, -w, L, W); g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1; for (let x = -h - W; x < h; x += 3) { g.beginPath(); g.moveTo(x, -w); g.lineTo(x + W, w); g.stroke(); } g.fillStyle = a1; g.fillRect(-h, -w, L, 2.5); g.fillRect(-h, w - 2.5, L, 2.5); }
-  else if (lv === 'flame') { for (const [c, k] of [[a1, 1], [mixHex(a1, '#ffffff', 0.55), 0.6]]) { g.fillStyle = c; g.beginPath(); g.moveTo(h, -w * k); for (let i = 0; i <= 6; i++) { const y = -w * k + (2 * w * k) * i / 6; g.lineTo(h - L * (i % 2 ? 0.55 : 0.3) * k, y); } g.lineTo(h, w * k); g.closePath(); g.fill(); } }
-  else if (lv === 'camo') { const r = rnd(7); for (let i = 0; i < 9; i++) { g.fillStyle = i % 2 ? a2 : mixHex(col, a2, 0.45); g.beginPath(); g.ellipse(-h + r() * L, -w + r() * W, 4 + r() * 6, 3 + r() * 4, r() * 3, 0, 7); g.fill(); } }
+  if (lv === 'stripe') { g.fillStyle = a2; g.fillRect(-h, -4.6, L, 9.2); g.fillStyle = a1; g.fillRect(-h, -3.2, L, 6.4); }
+  else if (lv === 'racing') { g.fillStyle = a2; g.fillRect(-h, -7.4, L, 5.6); g.fillRect(-h, 1.8, L, 5.6); g.fillStyle = a1; g.fillRect(-h, -6.6, L, 4); g.fillRect(-h, 2.6, L, 4); }
+  else if (lv === 'checker') { const n = 6, s = W / n; for (let i = 0; i * s < L + s; i++) for (let j = 0; j < n; j++) { g.fillStyle = (i + j) % 2 ? a2 : a1; g.fillRect(-h + i * s, -w + j * s, s + 0.4, s + 0.4); } }
+  else if (lv === 'carbon') { const base = mixHex(a2, '#0c0c0f', 0.55), hi = mixHex(base, '#ffffff', 0.13), s = 3; g.fillStyle = base; g.fillRect(-h, -w, L, W); g.fillStyle = hi;
+    for (let i = 0; i * s < L; i++) for (let j = 0; j * s < W; j++) { if ((i + j) % 2) g.fillRect(-h + i * s, -w + j * s, s, s / 2); else g.fillRect(-h + i * s, -w + j * s, s / 2, s); }
+    g.fillStyle = a1; g.fillRect(-h, -w, L, 1.6); g.fillRect(-h, w - 1.6, L, 1.6); }
+  else if (lv === 'flame') { for (const [c, k, len] of [[a2, 1.08, 0.86], [a1, 1, 0.8], [mixHex(a1, '#ffffff', 0.5), 0.6, 0.6]]) { g.fillStyle = c; g.beginPath(); g.moveTo(h + 2, -w * k); for (let i = 0; i <= 8; i++) { const y = -w * k + (2 * w * k) * i / 8; g.lineTo(h - L * (i % 2 ? len : len * 0.55), y); } g.lineTo(h + 2, w * k); g.closePath(); g.fill(); } }
+  else if (lv === 'camo') { const r = rnd(7); g.fillStyle = mixHex(col, a2, 0.2); g.fillRect(-h, -w, L, W); for (let i = 0; i < 38; i++) { g.fillStyle = [a2, mixHex(col, a2, 0.55), mixHex(col, a1, 0.35)][i % 3]; g.beginPath(); g.ellipse(-h + r() * L, -w + r() * W, 3 + r() * 6, 2 + r() * 4, r() * 3, 0, 7); g.fill(); } }
+  else if (lv === 'split') { g.fillStyle = a1; g.beginPath(); g.moveTo(L * 0.1, -w - 1); g.lineTo(-L * 0.1, w + 1); g.lineTo(-h - 1, w + 1); g.lineTo(-h - 1, -w - 1); g.closePath(); g.fill(); g.strokeStyle = a2; g.lineWidth = 2.2; g.beginPath(); g.moveTo(L * 0.1, -w - 1); g.lineTo(-L * 0.1, w + 1); g.stroke(); }
+  else if (lv === 'fade') { const gr = g.createLinearGradient(h, 0, -h, 0); gr.addColorStop(0, rgba(a1, 0)); gr.addColorStop(0.55, rgba(a1, 0.55)); gr.addColorStop(1, rgba(a1, 1)); g.fillStyle = gr; g.fillRect(-h, -w, L, W);
+    const r = rnd(3); g.fillStyle = a2; for (let i = 0; i < 26; i++) { const x = -h + Math.pow(r(), 1.8) * L * 0.6; g.beginPath(); g.arc(x, -w + r() * W, 0.6 + r() * 1.1, 0, 7); g.fill(); } }
 }
 
 function finishShade(g, k, L, W) {
@@ -62,6 +67,7 @@ function drawCar(g, c, night) {
   const t = carType(c.body), id = t.id, L = CAR.L * t.l, W = CAR.W * t.w, h = L / 2, w = W / 2, col = c.color || '#ff3b3b', lv = c.livery || 'clean';
   g.save(); g.translate(c.x, c.y); g.rotate(c.a);
   if (night) { g.save(); g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(h, 0, 4, h + 170, 0, 230); gr.addColorStop(0, 'rgba(255,240,200,.2)'); gr.addColorStop(1, 'rgba(255,240,200,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(h * 0.9, -w * 0.7); g.lineTo(h + 250, -110); g.lineTo(h + 250, 110); g.lineTo(h * 0.9, w * 0.7); g.fill(); g.restore(); }
+  if (c.glow) { g.save(); g.globalCompositeOperation = 'lighter'; const gg = g.createRadialGradient(0, 0, 3, 0, 0, L * 0.8); gg.addColorStop(0, rgba(c.glow, 0.6)); gg.addColorStop(0.6, rgba(c.glow, 0.22)); gg.addColorStop(1, rgba(c.glow, 0)); g.fillStyle = gg; g.beginPath(); g.ellipse(0, 0, L * 0.8, W * 1.05, 0, 0, 7); g.fill(); g.restore(); }
   // shadow
   g.fillStyle = 'rgba(0,0,0,.38)'; g.save(); g.translate(5, 7); bodyPath(g, id, L, W); g.fill(); g.restore();
   // wheels
@@ -75,15 +81,17 @@ function drawCar(g, c, night) {
   bodyPath(g, id, L, W); g.fillStyle = bg; g.fill();
   g.save(); bodyPath(g, id, L, W); g.clip(); drawLivery(g, id === 'muscle' && lv === 'clean' ? 'racing' : lv, col, L, W, id, c.accent, c.accent2);
   finishShade(g, c.finish, L, W);
-  if (id === 'kei') { g.fillStyle = shadeHex(col, 0.75); g.fillRect(-h, -w, L * 0.6, W); g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 1.5; g.strokeRect(-h + 3, -w + 3, L * 0.6 - 6, W - 6); g.beginPath(); g.moveTo(-h + 3 + L * 0.2, -w + 3); g.lineTo(-h + 3 + L * 0.2, w - 3); g.moveTo(-h + 3 + L * 0.4, -w + 3); g.lineTo(-h + 3 + L * 0.4, w - 3); g.stroke(); }
+  if (id === 'kei') { g.fillStyle = shadeHex(col, 0.75); g.fillRect(-h, -w, L * 0.6, W); if (lv !== 'clean') { g.save(); g.beginPath(); g.rect(-h, -w, L * 0.6, W); g.clip(); drawLivery(g, lv, col, L, W, id, c.accent, c.accent2); g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(-h, -w, L * 0.6, W); g.restore(); } g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 1.5; g.strokeRect(-h + 3, -w + 3, L * 0.6 - 6, W - 6); g.beginPath(); g.moveTo(-h + 3 + L * 0.2, -w + 3); g.lineTo(-h + 3 + L * 0.2, w - 3); g.moveTo(-h + 3 + L * 0.4, -w + 3); g.lineTo(-h + 3 + L * 0.4, w - 3); g.stroke(); }
   g.restore();
   bodyPath(g, id, L, W); g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 1.5; g.stroke();
   // cabin / glass
   const glass = (x0, x1, y0, y1) => { const wg = g.createLinearGradient(x0, 0, x1, 0); wg.addColorStop(0, '#0d1420'); wg.addColorStop(1, '#4a6a8a'); g.fillStyle = wg; g.beginPath(); g.moveTo(x0, -y0); g.lineTo(x1, -y1); g.lineTo(x1, y1); g.lineTo(x0, y0); g.closePath(); g.fill(); };
+  const elv = id === 'muscle' && lv === 'clean' ? 'racing' : lv, roof = (x, y, rw, rh) => { g.fillStyle = shadeHex(col, 1.3); g.beginPath(); g.roundRect(x, y, rw, rh, 4); g.fill();
+    if (elv !== 'clean') { g.save(); g.beginPath(); g.roundRect(x, y, rw, rh, 4); g.clip(); drawLivery(g, elv, col, L, W, id, c.accent, c.accent2); finishShade(g, c.finish, L, W); g.fillStyle = 'rgba(255,255,255,.1)'; g.fillRect(x, y, rw, rh); g.restore(); } g.strokeStyle = 'rgba(0,0,0,.25)'; g.lineWidth = 1; g.beginPath(); g.roundRect(x, y, rw, rh, 4); g.stroke(); };
   if (id === 'f1') { g.fillStyle = '#0d1420'; g.beginPath(); g.ellipse(-L * 0.05, 0, L * 0.11, w * 0.32, 0, 0, 7); g.fill(); g.strokeStyle = '#222'; g.lineWidth = 2.5; g.beginPath(); g.arc(-L * 0.02, 0, w * 0.4, -1.2, 1.2); g.stroke(); g.fillStyle = '#ffd60a'; g.beginPath(); g.arc(-L * 0.08, 0, 3.2, 0, 7); g.fill(); }
-  else if (id === 'kei') { glass(h - L * 0.1, h - L * 0.2, w * 0.82, w * 0.72); g.fillStyle = shadeHex(col, 1.3); g.fillRect(h - L * 0.4, -w * 0.78, L * 0.2, W * 0.78); }
-  else if (id === 'hatch') { glass(L * 0.12, L * 0.28, w * 0.76, w * 0.6); g.fillStyle = shadeHex(col, 1.3); g.beginPath(); g.roundRect(-h + 4, -w * 0.72, L * 0.62, W * 0.72, 4); g.fill(); g.fillStyle = '#132030'; g.fillRect(-h + 2, -w * 0.62, 4, W * 0.62); g.fillStyle = shadeHex(col, 0.45); g.fillRect(-h - 2, -w * 0.85, 5, W * 0.85); }
-  else { const cx = id === 'muscle' ? -L * 0.12 : id === 'gt' ? -L * 0.08 : 0; glass(cx + L * 0.06, cx + L * 0.24, w * 0.76, w * 0.6); g.fillStyle = shadeHex(col, 1.3); g.beginPath(); g.roundRect(cx - L * 0.2, -w * 0.72, L * 0.26, W * 0.72, 4); g.fill(); g.fillStyle = '#132030'; g.fillRect(cx - L * 0.32, -w * 0.66, L * 0.1, W * 0.66); }
+  else if (id === 'kei') { glass(h - L * 0.1, h - L * 0.2, w * 0.82, w * 0.72); roof(h - L * 0.4, -w * 0.78, L * 0.2, W * 0.78); }
+  else if (id === 'hatch') { glass(L * 0.12, L * 0.28, w * 0.76, w * 0.6); roof(-h + 4, -w * 0.72, L * 0.62, W * 0.72); g.fillStyle = '#132030'; g.fillRect(-h + 2, -w * 0.62, 4, W * 0.62); g.fillStyle = shadeHex(col, 0.45); g.fillRect(-h - 2, -w * 0.85, 5, W * 0.85); }
+  else { const cx = id === 'muscle' ? -L * 0.12 : id === 'gt' ? -L * 0.08 : 0; glass(cx + L * 0.06, cx + L * 0.24, w * 0.76, w * 0.6); roof(cx - L * 0.2, -w * 0.72, L * 0.26, W * 0.72); g.fillStyle = '#132030'; g.fillRect(cx - L * 0.32, -w * 0.66, L * 0.1, W * 0.66); }
   // type extras
   if (id === 'gt' || id === 'drift' || id === 'street') { g.fillStyle = id === 'gt' ? '#18181b' : shadeHex(col, 0.45); const ww = id === 'gt' ? 8 : 6; g.fillRect(-h - (id === 'gt' ? 5 : 3), -w + (id === 'gt' ? -2 : 1), ww, W + (id === 'gt' ? 4 : -2)); }
   if (id === 'drift') { g.fillStyle = '#18181b'; g.fillRect(h - 2, -w + 2, 4, W - 4); g.fillStyle = shadeHex(col, 0.55); for (const sx of [-1, 1]) { g.fillRect(-L * 0.42, sx * w - (sx > 0 ? 3 : 0), 15, 3); g.fillRect(L * 0.23, sx * w - (sx > 0 ? 3 : 0), 15, 3); } }

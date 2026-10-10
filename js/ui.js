@@ -1,9 +1,11 @@
 // ===== Menus, lobby, input, network wiring =====
-emitCfg = () => ({ track: CFG.track, laps: CFG.laps, mode: CFG.mode });
-const MODES = { race: 'Race (fastest)', drift: 'Drift battle', tt: 'Race (fastest)' };
+emitCfg = () => ({ track: CFG.track, laps: CFG.laps, mode: CFG.mode, wx: CFG.wx || 'auto' });
+const WXN = { auto: 'Track default', clear: 'Clear', rain: 'Rain', night: 'Night', storm: 'Night + rain', snow: 'Snow' };
+const MODES = { race: 'Race (fastest)', drift: 'Drift battle', tandem: 'Tandem drift', tt: 'Race (fastest)' };
 function msg(id, t) { if (id === 'joinMsg') id = { mp: 'joinMsg' }[TAB] || 'ttMsg'; $(id).textContent = t || ''; }
 function refreshMenu() {
-  if (CFG.mode !== 'race' && CFG.mode !== 'drift') CFG.mode = 'race'; // host-room mode; time trial has its own tab
+  if (typeof shopFix === 'function') shopFix();
+  if (CFG.mode !== 'race' && CFG.mode !== 'drift' && CFG.mode !== 'tandem') CFG.mode = 'race'; // host-room mode; time trial has its own tab
   $('nameIn').value = CFG.name;
   document.querySelectorAll('.prow').forEach(r => { const f = r.dataset.f, v = CFG[f]; r.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', s.dataset.c.toLowerCase() === String(v).toLowerCase())); const ci = r.querySelector('input[type=color]'), hi = r.querySelector('.hex'); ci.value = v; if (document.activeElement !== hi) { hi.value = v.toUpperCase(); hi.classList.remove('bad'); } });
   document.querySelectorAll('[data-fin]').forEach(s => s.classList.toggle('on', s.dataset.fin === CFG.finish)); if (document.activeElement !== $('numIn')) $('numIn').value = CFG.num;
@@ -16,8 +18,8 @@ function refreshMenu() {
   $('pubChk').disabled = !listOn(); $('pubRow').classList.toggle('dim', !listOn()); $('pubRow').title = listOn() ? '' : 'Needs Supabase set up (js/config.js)';
   const r = rec(CFG.track); $('records').textContent = `Your records on ${TRACKS[CFG.track].name}: best lap ${fmt(ACCT.bestLap(CFG.track) || r.lap)} • best drift score ${(r.score || 0).toLocaleString()}`;
   const t = carType(CFG.body); $('gDesc').textContent = t.name.toUpperCase() + ' · ' + t.desc;
-  drawCarPreview($('gPrev'), carLook(CFG), -0.5);
-  $('chip').querySelector('i').style.background = CFG.color; $('chip').querySelector('b').textContent = CFG.name; $('chip').querySelector('small').textContent = ACCT.reg ? ACCT.key.slice(0, 8) + '-····-····' : 'Guest · create account';
+  drawCarPreview($('gPrev'), carLook(CFG), -0.5); if (typeof shopDecorate === 'function') shopDecorate();
+  $('chip').querySelector('i').style.background = CFG.color; $('chip').querySelector('b').textContent = CFG.name; $('chip').querySelector('small').textContent = (ACCT.reg ? '' : 'Guest · ') + '🪙 ' + (ACCT.stats.coins || 0).toLocaleString() + ' coins';
   refreshAcct();
 }
 let LBSEQ = 0, TAB = 'tt', LBT = 0, LBTimer = 0, KEYSHOWN = false;
@@ -33,11 +35,12 @@ let LBPOLL = 0;
 async function loadLB() {
   document.querySelectorAll('[data-lbt]').forEach(b => b.classList.toggle('on', b.dataset.lbt === String(LBT)));
   if (LBT === 'wr') return loadWR();
+  if (LBT === 'dist' || LBT === 'drift') return loadStatLB(LBT);
   const my = ++LBSEQ, res = await LB.top(LBT); if (my !== LBSEQ) return; // ignore slow, out-of-date responses
   $('lbHead').innerHTML = res.live ? '<span class="live"></span> Live · global · fastest lap per driver' : (res.err ? '⚠ Leaderboard server unreachable · showing this device' : 'This device · fastest lap per account') + ` · ${TRACKS[LBT].name}`;
   const best = res.rows[0] ? res.rows[0].lap : 0;
   clearTimeout(LBPOLL); if (res.rows.some(x => x.pending)) LBPOLL = setTimeout(() => { if (TAB === 'lb' && G.state === 'menu') { LB.flush(); loadLB(); } }, 3000);
-  $('lbTable').innerHTML = '<tr><th>POS</th><th>DRIVER</th><th>TIME</th><th>GAP</th><th>DATE SET</th><th></th></tr>' + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td><i style="background:${esc(liveCol(x))}"></i>${esc(x.name)}${i === 0 ? ' <small class="wrtag">WR</small>' : ''}${x.pending ? ' <small style="color:#ff9a2a">· uploading</small>' : ''}${x.failed ? ` <small style="color:#ff5a5a" title="${esc(x.failed)}">· not uploaded (hover for why)</small>` : ''}</td><td>${fmt(x.lap)}</td><td>${i ? '+' + ((x.lap - best) / 1000).toFixed(3) : '—'}</td><td>${x.at ? new Date(x.at).toLocaleDateString() : ''}</td><td><button class="btn dark sm" data-ghost="${i}" title="Race this lap's ghost in Time trial">Race against ghost</button></td></tr>`).join('') : '<tr><td colspan="6" style="color:#8b8b93;padding:22px">No laps yet. Set one in Time trial.</td></tr>'); LBROWS = res.rows; $('lbTable').querySelectorAll('[data-ghost]').forEach(b => b.onclick = () => raceGhost(LBT, LBROWS[+b.dataset.ghost], b));
+  $('lbTable').innerHTML = '<tr><th>POS</th><th>DRIVER</th><th>TIME</th><th>GAP</th><th>DATE SET</th><th></th></tr>' + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td><i style="background:${esc(liveCol(x))}"></i>${esc(x.name)}${i === 0 ? ' <small class="wrtag">WR</small>' : ''}${x.pending ? ' <small style="color:#ff9a2a">· uploading</small>' : ''}${x.failed ? ` <small style="color:#ff5a5a" title="${esc(x.failed)}">· not uploaded (hover for why)</small>` : ''}</td><td>${fmt(x.lap)}</td><td>${i ? '+' + ((x.lap - best) / 1000).toFixed(3) : '—'}</td><td>${x.at ? new Date(x.at).toLocaleDateString() : ''}</td><td><button class="btn dark sm" data-watch="${i}" title="Watch this lap with replay cameras">Watch</button> <button class="btn dark sm" data-ghost="${i}" title="Race this lap's ghost in Time trial">Race against ghost</button></td></tr>`).join('') : '<tr><td colspan="6" style="color:#8b8b93;padding:22px">No laps yet. Set one in Time trial.</td></tr>'); LBROWS = res.rows; $('lbTable').querySelectorAll('[data-ghost]').forEach(b => b.onclick = () => raceGhost(LBT, LBROWS[+b.dataset.ghost], b));
 }
 // your own rows always show your current paint, other drivers' colour is kept in sync by the server (set_color)
 function liveCol(x) { return (x.pid === ACCT.pub ? CFG.color : x.color) || '#888'; }
@@ -82,6 +85,7 @@ function buildMenu() {
     const sp = document.createElement('span'); sp.textContent = t.name; d.appendChild(c); d.appendChild(sp); d.onclick = () => { CFG.track = i; saveCfg(); refreshMenu(); }; $('tracks').appendChild(d);
     const b = document.createElement('button'); b.className = 'opt'; b.dataset.lbt = i; b.textContent = t.name; b.onclick = () => { LBT = i; loadLB(); }; $('lbTracks').appendChild(b); });
   { const b = document.createElement('button'); b.className = 'opt wrb'; b.dataset.lbt = 'wr'; b.textContent = '🏆 Total WRs'; b.onclick = () => { LBT = 'wr'; loadLB(); }; $('lbTracks').appendChild(b); }
+  for (const [k, t] of [['dist', '🛣 Furthest driven'], ['drift', '💨 Drift points']]) { const b = document.createElement('button'); b.className = 'opt wrb'; b.dataset.lbt = k; b.textContent = t; b.onclick = () => { LBT = k; loadLB(); }; $('lbTracks').appendChild(b); }
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { CFG.mode = b.dataset.mode; saveCfg(); refreshMenu(); });
   document.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { CFG.laps = +b.dataset.l; saveCfg(); refreshMenu(); });
   $('nameIn').onclick = () => { setTab('acct'); if (ACCT.reg) $('acctName').focus(); else $('regName').focus(); };
@@ -135,8 +139,10 @@ function showLobby(d) {
     const tOpts = TRACKS.map((t, i) => t.test || t.hidden ? '' : `<option value="${i}"${i === c.track ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
     $('lobbyCfg').innerHTML = `<b>Race settings</b> <span class="dim">· everyone sees changes straight away</span>
       <label>Track</label><select id="lcT">${tOpts}</select>
-      <label>Mode</label><div class="row">${['race', 'drift'].map(m => `<button class="opt${c.mode === m ? ' on' : ''}" data-lm="${m}">${m === 'drift' ? '💨' : '🏁'} ${MODES[m]}</button>`).join('')}</div>
-      <label>Laps</label><div class="row">${[1, 3, 5, 10, 0].map(l => `<button class="opt${c.laps === l ? ' on' : ''}" data-ll="${l}">${l ? l : 'Free roam'}</button>`).join('')}</div>`;
+      <label>Mode</label><div class="row">${['race', 'drift', 'tandem'].map(m => `<button class="opt${c.mode === m ? ' on' : ''}" data-lm="${m}">${MODES[m]}</button>`).join('')}</div>
+      <label>Laps</label><div class="row">${[1, 3, 5, 10, 0].map(l => `<button class="opt${c.laps === l ? ' on' : ''}" data-ll="${l}">${l ? l : 'Free roam'}</button>`).join('')}</div>
+      <label>Weather &amp; time</label><div class="row wrap">${Object.keys(WXN).map(w => `<button class="opt${(c.wx || 'auto') === w ? ' on' : ''}" data-lw="${w}">${WXN[w]}</button>`).join('')}</div>${c.mode === 'tandem' ? '<p class="hint">Tandem: drift close behind (or ahead of) another driver for double drift points.</p>' : ''}`;
+    $('lobbyCfg').querySelectorAll('[data-lw]').forEach(b => b.onclick = () => { CFG.wx = b.dataset.lw; saveCfg(); netLobby(); });
     $('lcT').onchange = () => { CFG.track = +$('lcT').value; saveCfg(); netLobby(); };
     $('lobbyCfg').querySelectorAll('[data-lm]').forEach(b => b.onclick = () => { CFG.mode = b.dataset.lm; saveCfg(); netLobby(); });
     $('lobbyCfg').querySelectorAll('[data-ll]').forEach(b => b.onclick = () => { CFG.laps = +b.dataset.ll; saveCfg(); netLobby(); });
@@ -144,7 +150,7 @@ function showLobby(d) {
     $('bStart').classList.remove('hidden'); $('bStart').textContent = G.plist.length > 1 ? `Start race (${G.plist.length} drivers)` : 'Start (waiting for friends…)';
     msg('lobbyMsg', G.plist.length > 1 ? '' : 'Share the code above. You can also start alone to test.');
   } else {
-    $('pubRow').classList.add('hidden'); $('lobbyCfg').innerHTML = c.track !== undefined ? '<b>Race settings</b> <span class="dim">· the host picks these</span><div class="ro">' + esc( `Track: ${TRACKS[c.track].name} • ${c.laps ? c.laps + ' laps' : 'Free roam'} • ${MODES[c.mode]}`) + '</div>' : '';
+    $('pubRow').classList.add('hidden'); $('lobbyCfg').innerHTML = c.track !== undefined ? '<b>Race settings</b> <span class="dim">· the host picks these</span><div class="ro">' + esc( `Track: ${TRACKS[c.track].name} • ${c.laps ? c.laps + ' laps' : 'Free roam'} • ${MODES[c.mode]}${c.wx && c.wx !== 'auto' ? ' • ' + (WXN[c.wx] || '') : ''}`) + '</div>' : '';
     $('bStart').classList.add('hidden'); $('lobbyHint').textContent = 'You are in the room. The host starts the race.'; if (G.plist.length) msg('lobbyMsg', 'Waiting for the host to start…');
     if (c.track !== undefined && G.attract && G.attract.idx !== c.track) CFG.track = c.track;
   }
@@ -155,6 +161,8 @@ netOn('all', d => { if (G.state !== 'race' && G.state !== 'countdown') return; f
 netOn('st', d => { if (G.state === 'race' || G.state === 'countdown') applyState(d.id, d.s); });
 netOn('fin', d => { if (G.state === 'race') hostFin(d.id, d.time, d.score, d.laps, d.rid); });
 netOn('res', d => { if (!NET.host && G.me && (d.rid || 0) === G.rid) applyRes(d.list, d.final); });
+netOn('migrating', d => { G.rem.clear(); G.firstFin = null; G.mp = true; G.plist = (G.plist || []).filter(p => p.id !== 'host'); showLobby({ players: [], cfg: {} }); msg('lobbyMsg', d.me ? 'The host left, so you are taking over as host…' : 'The host left. ' + d.name + ' is taking over as host…'); });
+netOn('migrated', d => { G.mp = true; G.state = 'lobby'; if (d.host) { netLobby(); msg('lobbyMsg', 'The host left, so you are the host now.'); } else msg('lobbyMsg', d.name + ' is the host now.'); });
 netOn('hostgone', () => { toMenu(); msg('joinMsg', 'The host left, so the room has closed.'); });
 netOn('busy', d => { toMenu(); msg('joinMsg', d.msg); });
 netOn('neterror', e => msg(G.state === 'lobby' ? 'lobbyMsg' : 'joinMsg', netErrText(e)));
@@ -298,11 +306,11 @@ const TOUCH = { up: 0, down: 0, left: 0, right: 0, hb: 0 };
 
 // ---------- players online (Supabase realtime presence, no table needed) ----------
 let ONL = null;
-function onlineMeta() { return { name: CFG.name || 'Driver', color: CFG.color, pid: (typeof ACCT !== 'undefined' && ACCT.pub) || '', where: G.state === 'menu' || !G.tr ? 'Menu' : G.mp ? 'Multiplayer' : 'Time trial', track: G.state !== 'menu' && G.tr ? G.tr.name || '' : '', t: Date.now() }; }
-function onlineShow() { const el = $('onlineN'); if (!el || !ONL) return; const n = Object.keys(ONL.presenceState()).length; el.textContent = n + ' online'; el.style.display = n ? '' : 'none'; }
+function onlineMeta() { return { name: CFG.name || 'Driver', color: CFG.color, pid: myPid(), where: G.state === 'menu' || !G.tr ? 'Menu' : G.mp ? 'Multiplayer' : 'Time trial', track: G.state !== 'menu' && G.tr ? G.tr.name || '' : '', t: Date.now() }; }
+function onlineShow() { const el = $('onlineN'); if (!el || !ONL) return; const st = ONL.presenceState(), ids = new Set(); for (const k in st) { const m = st[k][st[k].length - 1]; ids.add((m && m.pid) || k); } const n = ids.size; el.textContent = n + ' online'; el.style.display = n ? '' : 'none'; }
 function onlineStart() {
   if (ONL || typeof supabase === 'undefined' || typeof CLOUD === 'undefined' || !CLOUD) return;
-  try { ONL = sbc().channel('md-online', { config: { presence: { key: 'p' + Math.random().toString(36).slice(2, 10) } } });
+  try { ONL = sbc().channel('md-online', { config: { presence: { key: 'p' + myPid() } } });
     ONL.on('presence', { event: 'sync' }, onlineShow);
     ONL.subscribe(st => { if (st === 'SUBSCRIBED') ONL.track(onlineMeta()); });
     setInterval(() => { try { ONL.track(onlineMeta()); } catch (e) { } }, 20000);
@@ -323,3 +331,9 @@ document.querySelectorAll('#netSw button').forEach(b => b.onclick = () => {
   localStorage.setItem('md_netmode', b.dataset.nm); netSwUI(); try { serversWatch(renderServers); } catch (e) { }
 });
 netSwUI();
+
+async function loadStatLB(k) {
+  const my = ++LBSEQ, res = await LB.stat(k); if (my !== LBSEQ) return;
+  $('lbHead').innerHTML = (res.live ? '<span class="live"></span> Live · global' : (res.err ? '⚠ Leaderboard server unreachable · showing you' : 'This device')) + (k === 'dist' ? ' · total distance driven' : ' · total drift points scored');
+  $('lbTable').innerHTML = `<tr><th>POS</th><th>DRIVER</th><th>${k === 'dist' ? 'DISTANCE' : 'DRIFT POINTS'}</th></tr>` + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td><i style="background:${esc(liveCol(x))}"></i>${esc(x.name)}</td><td><b>${k === 'dist' ? (+x.v || 0).toFixed(1) + ' km' : Math.round(+x.v || 0).toLocaleString()}</b></td></tr>`).join('') : '<tr><td colspan="3" style="color:#8b8b93;padding:22px">Nobody yet. Get driving!</td></tr>');
+}

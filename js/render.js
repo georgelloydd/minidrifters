@@ -1,7 +1,7 @@
 // ===== Rendering, HUD, minimap, menu background =====
 function worldToScreen(cam, x, y) { let dx = (x - cam.x) * cam.z, dy = (y - cam.y) * cam.z; if (G.rot && G.state !== 'menu' && G.state !== 'lobby') { const c = Math.cos(cam.a), s = Math.sin(cam.a); [dx, dy] = [dx * c - dy * s, dx * s + dy * c]; } return [VW / 2 + dx, VH / 2 + dy]; }
 function drawWorld(tr, cam, cars, rot) {
-  const th = tr.th, night = !!th.night;
+  const th = tr.th, wx = G.state === 'menu' || G.state === 'lobby' ? 'auto' : (G.wx || 'auto'), night = wx === 'auto' ? !!th.night : (wx === 'night' || wx === 'storm'), snowy = wx === 'auto' ? !!th.snow : wx === 'snow', rainy = wx === 'rain' || wx === 'storm';
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.fillStyle = shadeHex(th.grass, 0.55); ctx.fillRect(0, 0, VW, VH);
   ctx.save(); ctx.translate(VW / 2, VH / 2); if (rot) ctx.rotate(cam.a); ctx.scale(cam.z, cam.z); ctx.translate(-cam.x, -cam.y);
   const hd = Math.hypot(VW, VH) / 2 / cam.z + 20, sx = Math.max(0, cam.x - hd), sy = Math.max(0, cam.y - hd), sw = Math.min(tr.W || WORLD_W, cam.x + hd) - sx, sh = Math.min(tr.H || WORLD_H, cam.y + hd) - sy, bs = tr.bs || 1;
@@ -12,14 +12,15 @@ function drawWorld(tr, cam, cars, rot) {
   drawTunnelFloor(ctx, tr);
   if (CFG.gfx.gates && G.state !== 'menu' && G.state !== 'lobby') drawGates(tr);
   if (G.state !== 'menu' && G.state !== 'lobby') drawMissArrow(tr);
-  if (G.smoke.length) { const sp = puffSprite(night); for (const p of G.smoke) { if (p.x + p.r < sx || p.y + p.r < sy || p.x - p.r > sx + sw || p.y - p.r > sy + sh) continue; ctx.globalAlpha = (1 - p.life / p.max) * 0.55; ctx.drawImage(sp, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2); } ctx.globalAlpha = 1; }
+  if (G.smoke.length) { const sp = puffSprite(night); for (const p of G.smoke) { if (p.x + p.r < sx || p.y + p.r < sy || p.x - p.r > sx + sw || p.y - p.r > sy + sh) continue; ctx.globalAlpha = (1 - p.life / p.max) * 0.55; ctx.drawImage(p.col ? puffSprite(night, p.col) : sp, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2); } ctx.globalAlpha = 1; }
   const dc = c => { if (c.finished && (G.state === 'race' || G.state === 'countdown' || G.state === 'over')) { drawFaded(c); } else drawCar(ctx, c, night); };
   const hi = []; for (const c of cars) { if (carLayer(tr, c) === 1) hi.push(c); else dc(c); }
   drawTunnelRoof(ctx, tr, 0.9 - 0.75 * tT); drawBridges(ctx, tr); hi.forEach(dc);
   ctx.restore();
   ctx.font = '700 13px Segoe UI, system-ui, sans-serif'; ctx.textAlign = 'center';
   for (const c of cars) { if (!c.name || c === G.me) continue; const [x, y] = worldToScreen(cam, c.x, c.y); const w = ctx.measureText(c.name).width + 14; ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(x - w / 2, y - 52, w, 20, 8); ctx.fill(); ctx.fillStyle = c.color; ctx.fillRect(x - w / 2 + 4, y - 35, w - 8, 2); ctx.fillStyle = '#fff'; ctx.fillText(c.name, x, y - 37); }
-  if (th.snow && CFG.gfx.weather) { if (!G.snow.length) for (let i = 0; i < 140; i++) G.snow.push([Math.random() * 2000, Math.random() * 1200, 1 + Math.random() * 2.5]); ctx.fillStyle = 'rgba(255,255,255,.85)'; for (const f of G.snow) { f[1] += f[2] * 0.9; f[0] += Math.sin(f[1] * 0.01) * 0.6; if (f[1] > VH) { f[1] = -5; f[0] = Math.random() * VW; } ctx.beginPath(); ctx.arc(f[0] % VW, f[1], f[2], 0, 7); ctx.fill(); } }
+  if (snowy && CFG.gfx.weather) { if (!G.snow.length) for (let i = 0; i < 140; i++) G.snow.push([Math.random() * 2000, Math.random() * 1200, 1 + Math.random() * 2.5]); ctx.fillStyle = 'rgba(255,255,255,.85)'; for (const f of G.snow) { f[1] += f[2] * 0.9; f[0] += Math.sin(f[1] * 0.01) * 0.6; if (f[1] > VH) { f[1] = -5; f[0] = Math.random() * VW; } ctx.beginPath(); ctx.arc(f[0] % VW, f[1], f[2], 0, 7); ctx.fill(); } }
+  if (rainy) { ctx.fillStyle = night ? 'rgba(8,12,28,.2)' : 'rgba(40,55,80,.18)'; ctx.fillRect(0, 0, VW, VH); if (CFG.gfx.weather) { if (!G.rain || !G.rain.length) { G.rain = []; for (let i = 0; i < 220; i++) G.rain.push([Math.random() * VW, Math.random() * VH, 10 + Math.random() * 14]); } ctx.strokeStyle = 'rgba(190,210,255,.42)'; ctx.lineWidth = 1.2; ctx.beginPath(); for (const r of G.rain) { r[1] += r[2] * 1.6; r[0] -= r[2] * 0.25; if (r[1] > VH) { r[1] = -20; r[0] = Math.random() * (VW + 100); } if (r[0] < -20) r[0] += VW + 40; ctx.moveTo(r[0], r[1]); ctx.lineTo(r[0] + r[2] * 0.25, r[1] - r[2]); } ctx.stroke(); } }
   if (CFG.gfx.vignette) { let vg = G.vg; if (!vg || G.vgK !== VW + 'x' + VH) { vg = G.vg = ctx.createRadialGradient(VW / 2, VH / 2, Math.min(VW, VH) * 0.45, VW / 2, VH / 2, Math.hypot(VW, VH) * 0.6); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.4)'); G.vgK = VW + 'x' + VH; } ctx.fillStyle = vg; ctx.fillRect(0, 0, VW, VH); }
 }
 function render(dt) {
@@ -53,7 +54,7 @@ function drawMissArrow(tr) {
   ctx.fillStyle = '#ff3b3b'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
   ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(-10, -16); ctx.lineTo(-3, 0); ctx.lineTo(-10, 16); ctx.closePath(); ctx.stroke(); ctx.fill(); ctx.restore();
 }
-function posOf(c) { const n = G.tr.n; if (G.cfg.mode === 'drift') return c.score + c.cur; return c.finished ? 1e9 - c.finished : (c.lap < 0 ? c.prog - n : c.lap * n + c.prog); }
+function posOf(c) { const n = G.tr.n; if (G.cfg.mode === 'drift' || G.cfg.mode === 'tandem') return c.score + c.cur; return c.finished ? 1e9 - c.finished : (c.lap < 0 ? c.prog - n : c.lap * n + c.prog); }
 function hud(now) {
   const T = (e, v) => { v = String(v); if (e._t !== v) { e._t = v; e.textContent = v; } };
   const me = G.me, d = $('driftBox');
@@ -113,8 +114,8 @@ function drawFaded(c) {
 
 // soft smoke puff, drawn once
 const PUFF = {};
-function puffSprite(night) {
-  const k = night ? 'n' : 'd'; if (PUFF[k]) return PUFF[k];
-  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32), col = night ? '170,180,230' : '238,238,242';
+function puffSprite(night, hex) {
+  const k = (night ? 'n' : 'd') + (hex || ''); if (PUFF[k]) return PUFF[k];
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32), col = hex ? (n => `${n >> 16},${(n >> 8) & 255},${n & 255}`)(parseInt((night ? mixHex(hex, '#8090d0', 0.25) : hex).slice(1), 16)) : night ? '170,180,230' : '238,238,242';
   gr.addColorStop(0, `rgba(${col},1)`); gr.addColorStop(0.55, `rgba(${col},.75)`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); return PUFF[k] = c;
 }

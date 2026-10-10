@@ -162,6 +162,17 @@ const LB = {
     if (okAny && typeof TAB !== 'undefined' && TAB === 'lb' && typeof loadLB === 'function' && G.state === 'menu') loadLB();
     if (Object.keys(this.pend()).length && !failed) this.flush();
   },
+  // totals leaderboards (distance / drift) straight from the public profiles
+  async stat(k) {
+    const mine = { pid: ACCT.pub, name: CFG.name, color: CFG.color, v: ACCT.stats[k] || 0 };
+    if (!CLOUD) return { live: false, rows: ACCT.reg ? [mine] : [] };
+    try {
+      const r = await sb('GET', `profiles?select=id,name:data->cfg->>name,color:data->cfg->>color,v:data->stats->${k}&data->>reg=eq.true&order=data->stats->${k}.desc.nullslast&limit=25`);
+      const rows = (r || []).filter(x => x.name && +x.v > 0).map(x => ({ pid: x.id === ACCT.priv ? ACCT.pub : x.id, name: x.name, color: x.color, v: +x.v }));
+      const me = rows.find(x => x.pid === ACCT.pub); if (me) me.v = Math.max(me.v, mine.v);
+      return { live: true, rows: rows.sort((a, b) => b.v - a.v).slice(0, 20) };
+    } catch (e) { return { live: false, err: true, rows: ACCT.reg ? [mine] : [] }; }
+  },
   async wrs() {
     const T = TRACKS.map((t, i) => i).filter(i => !TRACKS[i].test), by = {}; let live = !!CLOUD, err = false, tops;
     if (CLOUD) { try { tops = await Promise.all(T.map(i => sb('GET', `laps?track=eq.${i}&select=pid,name,color,lap_ms&order=lap_ms.asc&limit=1`).then(r => r && r[0] ? { pid: r[0].pid, name: r[0].name, color: r[0].color } : null))); } catch (e) { live = false; err = true; } }

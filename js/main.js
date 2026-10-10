@@ -25,11 +25,11 @@ function myId() { return G.mp ? NET.myId : 'me'; }
 function startSession(cfg, grid, mp, rid) {
   if (SESS.blocked) return;
   if (cfg.mode === 'tt') { cfg = Object.assign({}, cfg, { laps: 0 }); mp = false; grid = null; }
-  G.tt = cfg.mode === 'tt' ? { laps: 0, restarts: 0, cps: 0, start: 0 } : null; G.dist = 0;
+  G.tt = cfg.mode === 'tt' ? { laps: 0, restarts: 0, cps: 0, start: 0 } : null; G.dist = 0; G.wx = cfg.mode === 'tt' ? 'auto' : (cfg.wx || 'auto'); G.rain = [];
   G.cfg = cfg; G.mp = mp; G.tr = buildTrack(cfg.track); G.rem.clear(); G.res.clear(); G.resList = null; G.final = false; G.firstFin = 0; G.smoke = []; G.flag = false; G.rid = rid || 0; for (const k in KEYS) KEYS[k] = false;
   grid = grid || [myId()];
   grid.forEach((id, slot) => {
-    if (id === myId()) { G.me = newCar(slot, G.tr, id, CFG.name, CFG.color); Object.assign(G.me, carLook(CFG)); G.me.cpI = null; G.me.tw = TWEAKS; }
+    if (id === myId()) { G.me = newCar(slot, G.tr, id, CFG.name, CFG.color); Object.assign(G.me, carLook(CFG)); G.me.cpI = null; G.me.tw = TWEAKS; if (G.wx === 'rain' || G.wx === 'storm') G.me.tw = Object.assign({}, TWEAKS || {}, { grip: ((TWEAKS && TWEAKS.grip) || 1) * 0.86 }); }
     else { const p = G.plist.find(q => q.id === id) || { name: 'Driver', color: '#888' }; const rc = newCar(slot, G.tr, id, p.name, p.color); Object.assign(rc, carLook(p)); rc.color = carLook(p).color; G.rem.set(id, { car: rc, tgt: null, raw: null }); }
   });
   G.ghost = null; G.ghostCar = null; G.curSplits = []; G.splitStart = null; G.recL = null; G.recStart = null;
@@ -78,7 +78,7 @@ function hostRes(force) {
 }
 function applyRes(list, final) { G.resList = list; G.final = final; if (final) NET.inRace = false; if (G.me.finished || final) showBoard(); }
 function showBoard() {
-  if (!G.resList) return; const drift = G.cfg.mode === 'drift', L = [...G.resList];
+  if (!G.resList) return; const drift = G.cfg.mode === 'drift' || G.cfg.mode === 'tandem', L = [...G.resList];
   L.sort((a, b) => drift ? b.score - a.score : (!!b.time - !!a.time) || ((b.laps || 0) - (a.laps || 0)) || (a.time || 1e12) - (b.time || 1e12)); const maxL = Math.max(0, ...L.map(p => p.time ? p.laps || 0 : 0));
   const r = rec(G.cfg.track);
   let h = `<h2>${G.final ? (drift ? '💨 DRIFT BATTLE RESULTS' : '🏁 RACE RESULTS') : 'RESULTS (waiting for others…)'}</h2><table>`;
@@ -104,6 +104,7 @@ function tick(ts, bg) { try { tickInner(ts, bg); } catch (e) { reportErr(e); if 
 function tickInner(ts, bg) {
   if (!bg) requestAnimationFrame(tick);
   const now = performance.now(), dt = Math.min(bg ? 0.5 : 0.05, (ts - (G.last || ts)) / 1000); G.last = ts;
+  if (G.state === 'replay') { if (!bg) rpTick(dt); return; }
   if (G.state === 'menu' || G.state === 'lobby') { if (!bg) renderAttract(dt); return; }
   const me = G.me, racing = G.state === 'race';
   if (G.state === 'countdown') { const left = G.cdEnd - now; banner(left > 0 ? (G.cfg.laps ? String(Math.ceil(left / 1000)) : '') : ''); if (left <= 0) { G.state = 'race'; if (G.tt) G.tt.start = now; if (G.cfg.laps) { banner('GO!'); setTimeout(() => { if ($('banner').textContent === 'GO!') banner(''); }, 900); } } }
@@ -114,7 +115,7 @@ function tickInner(ts, bg) {
   // drift scoring
   if (racing && !me.finished) {
     G.dist += me.speed * dt;
-    if (me.drift && me.speed > 250 && !me.off) { me.cur += Math.abs(me.slip) * me.speed * dt * 0.12 * me.combo; me.comboT += dt; me.idle = 0; if (me.comboT > 1.6 && me.combo < 5) { me.comboT = 0; me.combo++; pop('COMBO x' + me.combo, '#ff3b3b'); } }
+    if (me.drift && me.speed > 250 && !me.off) { me.cur += Math.abs(me.slip) * me.speed * dt * 0.12 * me.combo * tdm(me); me.comboT += dt; me.idle = 0; if (me.comboT > 1.6 && me.combo < 5) { me.comboT = 0; me.combo++; pop('COMBO x' + me.combo, '#ff3b3b'); } }
     else if (me.cur > 0) { if (me.off) { pop('DRIFT FAILED', '#ff6060'); me.cur = 0; me.combo = 1; me.comboT = 0; } else { me.idle += dt; if (me.idle > 0.9) { const p = bankDrift(me); if (p > 20) pop('+' + p.toLocaleString() + (p > 3000 ? '  INSANE!' : p > 1200 ? '  GREAT DRIFT' : ''), '#ffe14d'); } } }
     const d = G.tr.dirs[me.hint], fwdTrack = me.vx * Math.cos(d) + me.vy * Math.sin(d); me.wrong = fwdTrack < -120 ? me.wrong + dt : 0;
   }
@@ -138,7 +139,7 @@ function effects(dt) {
   for (const c of [G.me, ...[...G.rem.values()].map(r => r.car)]) {
     const sliding = (c.drift || c.hb || (c.brake && c.speed > 500)) && c.speed > 120;
     if (sliding) { const w = wheelPos(c); if (c.rwL && CFG.gfx.skids) { skidSeg(c.rwL, w[0], snow); skidSeg(c.rwR, w[1], snow); } c.rwL = w[0]; c.rwR = w[1];
-      if (CFG.gfx.smoke && G.smoke.length < 140) for (const p of w) if (Math.random() < 0.3) G.smoke.push({ x: p[0], y: p[1], vx: (Math.random() - 0.5) * 40 - c.vx * 0.05, vy: (Math.random() - 0.5) * 40 - c.vy * 0.05, r: 12, life: 0, max: 0.8 + Math.random() * 0.6 }); }
+      if (CFG.gfx.smoke && G.smoke.length < 140) for (const p of w) if (Math.random() < 0.3) G.smoke.push({ x: p[0], y: p[1], vx: (Math.random() - 0.5) * 40 - c.vx * 0.05, vy: (Math.random() - 0.5) * 40 - c.vy * 0.05, r: 12, life: 0, max: 0.8 + Math.random() * 0.6, col: c.smoke || '' }); }
     else c.rwL = c.rwR = null;
   }
   G.smoke = G.smoke.filter(p => (p.life += dt) < p.max); for (const p of G.smoke) { p.x += p.vx * dt; p.y += p.vy * dt; p.r += 38 * dt; }
@@ -258,3 +259,10 @@ function gateCross(c, ox, oy, now) {
 // index of the first gate not yet passed this lap (the one highlighted yellow)
 function missedGate(c) { const n = nextGate(c); return n >= 0 && (c.gp || []).some((v, k) => v && k > n) ? n : -1; }
 function nextGate(c) { const K = G.tr.gates.length, gp = (c && c.gp) || []; for (let k = 0; k < K; k++) if (!gp[k]) return k; return -1; }
+
+// tandem: drifting close to another driver doubles your drift points
+function tdm(me) {
+  if (!G.cfg || G.cfg.mode !== 'tandem') return 1; let near = false;
+  for (const [, r] of G.rem) { const c = r.car; if (!c || c.finished) continue; const d = Math.hypot(c.x - me.x, c.y - me.y); if (d < 180 && d > 25 && Math.hypot(c.vx || 0, c.vy || 0) > 200) { near = true; break; } }
+  if (near && !me.tdm) pop('TANDEM x2', '#7bd8ff'); me.tdm = near; return near ? 2 : 1;
+}
