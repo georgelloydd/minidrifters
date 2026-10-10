@@ -209,3 +209,7 @@ body.touch #hud{top:calc(64px + env(safe-area-inset-top))}
 
 .wrtag{background:#ffd400;color:#111;font-weight:800;border-radius:4px;padding:1px 5px;font-size:10px;margin-left:4px}
 #lbTracks .wrb{border-color:#ffd400}
+
+.logo .onl{display:flex;align-items:center;gap:7px;margin-top:9px;font-size:12px;font-style:normal;font-weight:800;letter-spacing:1.5px;color:#9fe8b0;text-shadow:none;text-transform:uppercase}.logo .onl:before{content:'';width:8px;height:8px;border-radius:50%;background:#2ee66b;box-shadow:0 0 8px #2ee66b}
+
+.netsw{position:relative;display:inline-flex;margin-top:12px;padding:4px;border-radius:999px;background:#15151a;border:1px solid rgba(255,255,255,.12);user-select:none}.netsw button{position:relative;z-index:1;border:0;background:none;color:#aaa;font:800 13px inherit;font-family:inherit;padding:9px 16px;border-radius:999px;cursor:pointer;transition:color .2s}.netsw button.on{color:#111}.netsw button.off{opacity:.45}.netsw .nsKnob{position:absolute;top:4px;bottom:4px;left:4px;width:calc(50% - 4px);border-radius:999px;background:var(--red,#ff2a2a);box-shadow:0 0 14px rgba(255,42,42,.5);transition:transform .25s cubic-bezier(.3,1.4,.5,1)}.netsw[data-on=server] .nsKnob{transform:translateX(100%)}.netsw.lock{opacity:.6}.netsw button{flex:1 1 0;white-space:nowrap}

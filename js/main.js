@@ -240,7 +240,7 @@ function interpRemote(r, c, now) {
 }
 
 // Forced checkpoints: the NEXT gate only counts if the car actually drives through its line
-// (between the track edges, going the right way). Cutting the track or going round a gate on the run-off doesn't count.
+// (between the track edges, going the right way). Anywhere between the two tyre rows counts, run-off included.
 function gateCross(c, ox, oy, now) {
   // any gate, either direction; each gate counts once per lap (c.gp = gates passed this lap)
   if (c.lap < 0) return; const g = G.tr.gates, K = g.length; if (!c.gp) c.gp = [];
@@ -250,10 +250,11 @@ function gateCross(c, ox, oy, now) {
     const s0 = (ox - p[0]) * fx + (oy - p[1]) * fy, s1 = (c.x - p[0]) * fx + (c.y - p[1]) * fy;
     if (!((s0 < 0 && s1 >= 0) || (s0 > 0 && s1 <= 0))) continue;
     const t = s0 / (s0 - s1), lx = ox + (c.x - ox) * t - p[0], ly = oy + (c.y - oy) * t - p[1], lat = -lx * fy + ly * fx;
-    if (Math.abs(lat) > G.tr.w / 2 + 8) continue;
+    if (lat < -gateW(G.tr, q, -1) - 6 || lat > gateW(G.tr, q, 1) + 6) continue;
     c.gp[k] = true; c.seg = c.gp.filter(Boolean).length; c.ng = c.seg; c.cpI = (q.i + 3) % G.tr.n;
-    if (c === G.me) { if (G.tt) G.tt.cps++; pop('CHECKPOINT ' + c.seg + ' / ' + K, '#ffd400'); splitAt(k, now - c.lapStart); }
+    if (c === G.me) { if (G.tt) G.tt.cps++; splitAt(k, now - c.lapStart); const mk = missedGate(c); if (mk >= 0 && c.missK !== mk) pop('MISSED A CHECKPOINT · FOLLOW THE ARROW', '#ff3b3b'); c.missK = mk; }
   }
 }
 // index of the first gate not yet passed this lap (the one highlighted yellow)
+function missedGate(c) { const n = nextGate(c); return n >= 0 && (c.gp || []).some((v, k) => v && k > n) ? n : -1; }
 function nextGate(c) { const K = G.tr.gates.length, gp = (c && c.gp) || []; for (let k = 0; k < K; k++) if (!gp[k]) return k; return -1; }

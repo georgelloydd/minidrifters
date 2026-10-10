@@ -189,7 +189,7 @@ const LB = {
 async function loadTweaks() {
   if (!CLOUD || !ACCT.pub) return;
   try { const r = await sb('GET', 'player_tweaks?pid=eq.' + ACCT.pub + '&select=data'), d = (r && r[0] && r[0].data) || {}, t = Object.assign({}, TW_DEF);
-    for (const k in TW_DEF) { const v = d[k]; if (typeof v === 'number' && isFinite(v)) t[k] = k === 'inv' ? (v ? 1 : 0) : Math.max(k === 'maxs' || k === 'engine' ? 0.05 : 0, Math.min(10, v)); }
+    for (const k in TW_DEF) { const v = d[k]; if (typeof v === 'number' && isFinite(v)) t[k] = k === 'inv' ? (v ? 1 : 0) : Math.max(k === 'maxs' || k === 'engine' ? 0.01 : 0, Math.min(1000, v)); }
     TWEAKS = t; if (G.me) G.me.tw = TWEAKS; } catch (e) { }
 }
 setInterval(loadTweaks, 15000);

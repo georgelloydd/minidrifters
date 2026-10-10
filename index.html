@@ -39,7 +39,7 @@
 
 <div id="menu" class="screen">
   <nav id="nav">
-    <div class="logo"><small>MINI</small>DRIFTERS</div>
+    <div class="logo"><small>MINI</small>DRIFTERS<div id="onlineN" class="onl" style="display:none"></div></div>
     <button class="nv on" data-tab="tt">Time Trial</button>
     <button class="nv" data-tab="mp">Multiplayer</button>
     <button class="nv" data-tab="garage">Garage</button>
@@ -63,7 +63,7 @@
       <div id="mpMain">
         <div class="mpc mpTop">
           <div class="row big"><input id="codeIn" maxlength="5" placeholder="ROOM CODE" autocomplete="off"><button id="bJoin" class="btn primary">Join</button><span class="sep"></span><button id="bHost" class="btn dark">+ Host room</button></div>
-          <p id="joinMsg" class="msg"></p><p id="hostMsg" class="msg"></p><p id="hostNet" class="hint"></p>
+          <p id="joinMsg" class="msg"></p><p id="hostMsg" class="msg"></p><div class="netsw" id="netSw" role="radiogroup" aria-label="How to host"><span class="nsKnob"></span><button type="button" data-nm="wifi">&#128246; Host over Wi-Fi</button><button type="button" data-nm="server">&#9729; Host on server</button></div><p id="hostNet" class="hint"></p>
         </div>
         <label>Open rooms <span id="srvMode" class="dim"></span></label>
         <div id="servers" class="servers"></div>

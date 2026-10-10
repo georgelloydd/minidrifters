@@ -81,8 +81,11 @@ function netErrText(e) {
 // ===== Game server (WebSocket relay) =====
 // If a game server is set (dev dashboard -> Settings, or js/config.js GAME_SERVER), multiplayer goes through it instead
 // of peer-to-peer. WsPeer copies the bits of the PeerJS API the game uses, so the race code is the same either way.
+// how to host: 'wifi' (peer-to-peer, same network) or 'server' (the game server). Picked with the switch on the Multiplayer tab.
+function netPick() { try { return localStorage.getItem('md_netmode') || 'server'; } catch (e) { return 'server'; } }
+function srvConfigured() { const k = localStorage.getItem('md_netmode'); try { localStorage.setItem('md_netmode', 'server'); return !!srvUrl(); } finally { if (k === null) localStorage.removeItem('md_netmode'); else localStorage.setItem('md_netmode', k); } }
 function srvUrl() {
-  let u = ''; try { u = new URLSearchParams(location.search).get('server') || localStorage.getItem('md_server') || ''; } catch (e) { }
+  let u = '', q = ''; try { q = new URLSearchParams(location.search).get('server') || ''; if (!q && netPick() === 'wifi') return ''; u = q || localStorage.getItem('md_server') || ''; } catch (e) { }
   if (!u && typeof ONLINE !== 'undefined' && ONLINE.GAME_SERVER) u = ONLINE.GAME_SERVER;
   u = String(u || '').trim().replace(/\/+$/, ''); if (!u || u === 'off') return '';
   if (/^https:/i.test(u)) u = 'wss:' + u.slice(6); else if (/^http:/i.test(u)) u = 'ws:' + u.slice(5); else if (!/^wss?:/i.test(u)) u = 'wss://' + u;

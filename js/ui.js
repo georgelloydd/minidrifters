@@ -12,7 +12,7 @@ function refreshMenu() {
   document.querySelectorAll('[data-mode]').forEach(s => s.classList.toggle('on', s.dataset.mode === CFG.mode));
   document.querySelectorAll('[data-l]').forEach(s => s.classList.toggle('on', +s.dataset.l === CFG.laps));
   document.querySelectorAll('.ty').forEach(s => { s.classList.toggle('on', s.dataset.b === CFG.body); drawCarPreview(s.querySelector('canvas'), Object.assign(carLook(CFG), { body: s.dataset.b }), -0.35); });
-  $('hostNet').textContent = netAvailable() ? 'Peer-to-peer: no server needed. Works best when everyone is on the same Wi-Fi.' : netNeedText();
+  netSwUI();
   $('pubChk').disabled = !listOn(); $('pubRow').classList.toggle('dim', !listOn()); $('pubRow').title = listOn() ? '' : 'Needs Supabase set up (js/config.js)';
   const r = rec(CFG.track); $('records').textContent = `Your records on ${TRACKS[CFG.track].name}: best lap ${fmt(ACCT.bestLap(CFG.track) || r.lap)} • best drift score ${(r.score || 0).toLocaleString()}`;
   const t = carType(CFG.body); $('gDesc').textContent = t.name.toUpperCase() + ' · ' + t.desc;
@@ -56,7 +56,7 @@ function refreshAcct() {
 }
 function renderServers(list) {
   const box = $('servers');
-  if (list === null) { $('srvMode').textContent = '· peer-to-peer'; box.innerHTML = '<p class="hint">' + (netAvailable() ? 'Ask the host for their 5-letter code and type it above. (With Supabase set up, open rooms also show here.)' : esc(netNeedText())) + '</p>'; return; }
+  if (list === null) { $('srvMode').textContent = srvOn() ? '' : '· Wi-Fi'; box.innerHTML = '<p class="hint">' + (netAvailable() ? 'Ask the host for their 5-letter code and type it above. (With Supabase set up, open rooms also show here.)' : esc(netNeedText())) + '</p>'; return; }
   $('srvMode').textContent = '· ' + list.length + ' open';
   box.innerHTML = list.length ? list.map(v => `<div class="srv"><b>${esc(v.host)}</b><span>${esc((TRACKS[v.track] || {}).name || '')} · ${esc(String(v.mode || '').toUpperCase())}${v.laps ? ' · ' + v.laps + ' laps' : ''}</span><span>${v.players} driver${v.players === 1 ? '' : 's'}</span>${v.inRace ? '<em>RACING</em>' : `<button class="btn dark sm" data-code="${esc(v.code)}">Join</button>`}</div>`).join('') : '<p class="hint">No open rooms right now. Create one in Host Room and it will show up here.</p>';
   box.querySelectorAll('[data-code]').forEach(b => b.onclick = () => { if (G.state !== 'menu') return; $('codeIn').value = b.dataset.code; $('bJoin').click(); });
@@ -203,7 +203,7 @@ function renderGfx() {
 function keysHint() {
   const B = CFG.keys, n = k => esc(keyName(k));
   $('keysP').innerHTML = `${n(B.up)}/↑ throttle · ${n(B.down)}/↓ brake · ${n(B.left)} ${n(B.right)}/← → steer · ${n(B.hb)} handbrake · ${n(B.reset)} reset · ${n(B.cp)} checkpoint · ${n(B.cam)} camera · ${n(B.mute)} mute · ESC menu`;
-  $('ttHint').innerHTML = `Endless laps until you quit. <b>${n(B.reset)}</b> restarts the lap · <b>${n(B.cp)}</b> back to last checkpoint · <b>ESC</b> ends the session. Drive through the numbered gates in order; the next one glows yellow.`;
+  $('ttHint').innerHTML = `Endless laps until you quit. <b>${n(B.reset)}</b> restarts the lap · <b>${n(B.cp)}</b> back to last checkpoint · <b>ESC</b> ends the session. Drive between the yellow tyres at every checkpoint; they turn grey once you pass. Miss one and a red arrow points you back to it.`;
 }
 $('bBindReset').onclick = () => { CFG.keys = Object.assign({}, DEF_KEYS); BINDING = null; saveCfg(); renderBinds(); keysHint(); };
 $('bGfxReset').onclick = () => { CFG.gfx = Object.assign({}, DEF_GFX); applyGfx(); saveCfg(); renderGfx(); };
@@ -295,3 +295,31 @@ const TOUCH = { up: 0, down: 0, left: 0, right: 0, hb: 0 };
     if (show !== lastShow) { d.classList.toggle('hidden', !show); if (!show) for (const k in TOUCH) TOUCH[k] = 0; d.querySelectorAll('.on').forEach(x => x.classList.remove('on')); lastShow = show; }
     d.querySelector('[data-a=cp]').style.display = G.tt ? '' : 'none'; requestAnimationFrame(loop); })();
 })();
+
+// ---------- players online (Supabase realtime presence, no table needed) ----------
+let ONL = null;
+function onlineMeta() { return { name: CFG.name || 'Driver', color: CFG.color, pid: (typeof ACCT !== 'undefined' && ACCT.pub) || '', where: G.state === 'menu' || !G.tr ? 'Menu' : G.mp ? 'Multiplayer' : 'Time trial', track: G.state !== 'menu' && G.tr ? G.tr.name || '' : '', t: Date.now() }; }
+function onlineShow() { const el = $('onlineN'); if (!el || !ONL) return; const n = Object.keys(ONL.presenceState()).length; el.textContent = n + ' online'; el.style.display = n ? '' : 'none'; }
+function onlineStart() {
+  if (ONL || typeof supabase === 'undefined' || typeof CLOUD === 'undefined' || !CLOUD) return;
+  try { ONL = sbc().channel('md-online', { config: { presence: { key: 'p' + Math.random().toString(36).slice(2, 10) } } });
+    ONL.on('presence', { event: 'sync' }, onlineShow);
+    ONL.subscribe(st => { if (st === 'SUBSCRIBED') ONL.track(onlineMeta()); });
+    setInterval(() => { try { ONL.track(onlineMeta()); } catch (e) { } }, 20000);
+  } catch (e) { ONL = null; }
+}
+setTimeout(onlineStart, 600);
+
+// ---------- host over Wi-Fi / on server switch ----------
+function netSwUI() {
+  const sw = $('netSw'); if (!sw) return; const has = srvConfigured(), m = has ? netPick() : 'wifi';
+  sw.dataset.on = m; sw.querySelector('[data-nm="server"]').classList.toggle('off', !has); sw.querySelectorAll('button').forEach(b => { b.classList.toggle('on', b.dataset.nm === m); b.setAttribute('aria-checked', b.dataset.nm === m); });
+  sw.classList.toggle('lock', !!(typeof NET !== 'undefined' && NET.on));
+  $('hostNet').textContent = !netAvailable() && m === 'wifi' ? netNeedText() : m === 'server' ? 'Runs through the game server, so friends can join from anywhere.' : has ? 'Everyone on the same Wi-Fi joins with your room code.' : 'Everyone on the same Wi-Fi joins with your room code. (Hosting on a server needs a game server set up on the dev site.)';
+}
+document.querySelectorAll('#netSw button').forEach(b => b.onclick = () => {
+  if (typeof NET !== 'undefined' && NET.on) return pop('Leave the room first to switch', '#ffe14d');
+  if (b.dataset.nm === 'server' && !srvConfigured()) return pop('No game server set up yet', '#ff3b3b');
+  localStorage.setItem('md_netmode', b.dataset.nm); netSwUI(); try { serversWatch(renderServers); } catch (e) { }
+});
+netSwUI();

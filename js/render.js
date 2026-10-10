@@ -11,6 +11,7 @@ function drawWorld(tr, cam, cars, rot) {
   if (tT > 0.01 && sw > 0) { ctx.fillStyle = `rgba(2,3,12,${0.58 * tT})`; ctx.fillRect(sx, sy, sw, sh); }
   drawTunnelFloor(ctx, tr);
   if (CFG.gfx.gates && G.state !== 'menu' && G.state !== 'lobby') drawGates(tr);
+  if (G.state !== 'menu' && G.state !== 'lobby') drawMissArrow(tr);
   if (G.smoke.length) { const sp = puffSprite(night); for (const p of G.smoke) { if (p.x + p.r < sx || p.y + p.r < sy || p.x - p.r > sx + sw || p.y - p.r > sy + sh) continue; ctx.globalAlpha = (1 - p.life / p.max) * 0.55; ctx.drawImage(sp, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2); } ctx.globalAlpha = 1; }
   const dc = c => { if (c.finished && (G.state === 'race' || G.state === 'countdown' || G.state === 'over')) { drawFaded(c); } else drawCar(ctx, c, night); };
   const hi = []; for (const c of cars) { if (carLayer(tr, c) === 1) hi.push(c); else dc(c); }
@@ -35,20 +36,22 @@ function renderInner(dt, me) {
   if (CFG.gfx.fps) { G.fps = (G.fps || 60) * 0.94 + (1 / Math.max(dt, 1e-3)) * 0.06; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.font = '700 12px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText(Math.round(G.fps) + ' FPS', 14, VH - 14); }
 }
 function drawGates(tr) {
-  const me = G.me, live = me && me.lap >= 0, nx = me ? nextGate(me) + 1 : -1, t = performance.now() / 1000, ro = tr.w / 2 + RUNOFF;
-  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '900 11px Segoe UI, system-ui, sans-serif';
+  const me = G.me, live = me && me.lap >= 0; ctx.save();
   for (const g of tr.gates) {
-    const p = tr.pts[g.i], a = tr.dirs[g.i], px = -Math.sin(a), py = Math.cos(a), fx = Math.cos(a), fy = Math.sin(a), next = live && g.s === nx, done = live && !!(me.gp && me.gp[g.s - 1]);
-    const col = done ? '#7a776c' : '#ffd400';
-    if (next) { ctx.globalAlpha = 0.22 + 0.1 * Math.sin(t * 7); ctx.strokeStyle = '#ffd400'; ctx.lineWidth = 6; ctx.setLineDash([20, 18]); ctx.beginPath(); ctx.moveTo(p[0] - px * ro, p[1] - py * ro); ctx.lineTo(p[0] + px * ro, p[1] + py * ro); ctx.stroke(); ctx.setLineDash([]); }
-    for (const sd of [-1, 1]) {
-      const cx = p[0] + px * ro * sd, cy = p[1] + py * ro * sd;
-      if (next) { ctx.globalAlpha = 0.3 + 0.15 * Math.sin(t * 7); ctx.fillStyle = '#ffd400'; ctx.beginPath(); ctx.arc(cx, cy, 34, 0, 7); ctx.fill(); }
-      ctx.globalAlpha = done ? 0.6 : 1; drawTyreRow(ctx, cx, cy, fx, fy, col);
-      const lx = cx + px * sd * 22, ly = cy + py * sd * 22; ctx.fillStyle = '#0b0b0d'; ctx.beginPath(); ctx.arc(lx, ly, 9, 0, 7); ctx.fill(); ctx.fillStyle = col; ctx.fillText(g.s, lx, ly + 1);
-    }
+    const p = tr.pts[g.i], a = tr.dirs[g.i], px = -Math.sin(a), py = Math.cos(a), fx = Math.cos(a), fy = Math.sin(a), done = live && !!(me.gp && me.gp[g.s - 1]);
+    ctx.globalAlpha = done ? 0.7 : 1;
+    for (const sd of [-1, 1]) { const ro = gateW(tr, g, sd); drawTyreRow(ctx, p[0] + px * ro * sd, p[1] + py * ro * sd, fx, fy, done ? '#8d8d8d' : '#ffd400'); }
   }
   ctx.restore();
+}
+// a missed checkpoint: red arrow next to the car that keeps pointing at it
+function drawMissArrow(tr) {
+  const me = G.me; if (!me || me.lap < 0 || !tr.gates) return; const mk = missedGate(me); if (mk < 0) return;
+  const g = tr.gates[mk], p = tr.pts[g.i], dx = p[0] - me.x, dy = p[1] - me.y; if (Math.hypot(dx, dy) < 70) return;
+  const an = Math.atan2(dy, dx), pul = 1 + 0.1 * Math.sin(performance.now() / 120);
+  ctx.save(); ctx.translate(me.x + Math.cos(an) * 64, me.y + Math.sin(an) * 64); ctx.rotate(an); ctx.scale(pul, pul);
+  ctx.fillStyle = '#ff3b3b'; ctx.strokeStyle = '#000'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+  ctx.beginPath(); ctx.moveTo(24, 0); ctx.lineTo(-10, -16); ctx.lineTo(-3, 0); ctx.lineTo(-10, 16); ctx.closePath(); ctx.stroke(); ctx.fill(); ctx.restore();
 }
 function posOf(c) { const n = G.tr.n; if (G.cfg.mode === 'drift') return c.score + c.cur; return c.finished ? 1e9 - c.finished : (c.lap < 0 ? c.prog - n : c.lap * n + c.prog); }
 function hud(now) {
