@@ -31,12 +31,20 @@ function setTab(t) {
 }
 let LBPOLL = 0;
 async function loadLB() {
-  document.querySelectorAll('[data-lbt]').forEach(b => b.classList.toggle('on', +b.dataset.lbt === LBT));
+  document.querySelectorAll('[data-lbt]').forEach(b => b.classList.toggle('on', b.dataset.lbt === String(LBT)));
+  if (LBT === 'wr') return loadWR();
   const my = ++LBSEQ, res = await LB.top(LBT); if (my !== LBSEQ) return; // ignore slow, out-of-date responses
   $('lbHead').innerHTML = res.live ? '<span class="live"></span> Live · global · fastest lap per driver' : (res.err ? '⚠ Leaderboard server unreachable · showing this device' : 'This device · fastest lap per account') + ` · ${TRACKS[LBT].name}`;
   const best = res.rows[0] ? res.rows[0].lap : 0;
   clearTimeout(LBPOLL); if (res.rows.some(x => x.pending)) LBPOLL = setTimeout(() => { if (TAB === 'lb' && G.state === 'menu') { LB.flush(); loadLB(); } }, 3000);
-  $('lbTable').innerHTML = '<tr><th>POS</th><th>DRIVER</th><th>CAR</th><th>BEST LAP</th><th>GAP</th><th>SET</th><th></th></tr>' + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td><i style="background:${esc(x.color || '#888')}"></i>${esc(x.name)}${x.pending ? ' <small style="color:#ff9a2a">· uploading</small>' : ''}${x.failed ? ` <small style="color:#ff5a5a" title="${esc(x.failed)}">· not uploaded (hover for why)</small>` : ''}</td><td>${esc(carType(x.body).name)}</td><td>${fmt(x.lap)}</td><td>${i ? '+' + ((x.lap - best) / 1000).toFixed(3) : '—'}</td><td>${x.at ? new Date(x.at).toLocaleDateString() : ''}</td><td><button class="btn dark sm" data-ghost="${i}" title="Race this lap's ghost in Time trial">Ghost</button></td></tr>`).join('') : '<tr><td colspan="7" style="color:#8b8b93;padding:22px">No laps yet. Set one in Time trial.</td></tr>'); LBROWS = res.rows; $('lbTable').querySelectorAll('[data-ghost]').forEach(b => b.onclick = () => raceGhost(LBT, LBROWS[+b.dataset.ghost], b));
+  $('lbTable').innerHTML = '<tr><th>POS</th><th>DRIVER</th><th>TIME</th><th>GAP</th><th>DATE SET</th><th></th></tr>' + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td><i style="background:${esc(liveCol(x))}"></i>${esc(x.name)}${i === 0 ? ' <small class="wrtag">WR</small>' : ''}${x.pending ? ' <small style="color:#ff9a2a">· uploading</small>' : ''}${x.failed ? ` <small style="color:#ff5a5a" title="${esc(x.failed)}">· not uploaded (hover for why)</small>` : ''}</td><td>${fmt(x.lap)}</td><td>${i ? '+' + ((x.lap - best) / 1000).toFixed(3) : '—'}</td><td>${x.at ? new Date(x.at).toLocaleDateString() : ''}</td><td><button class="btn dark sm" data-ghost="${i}" title="Race this lap's ghost in Time trial">Race against ghost</button></td></tr>`).join('') : '<tr><td colspan="6" style="color:#8b8b93;padding:22px">No laps yet. Set one in Time trial.</td></tr>'); LBROWS = res.rows; $('lbTable').querySelectorAll('[data-ghost]').forEach(b => b.onclick = () => raceGhost(LBT, LBROWS[+b.dataset.ghost], b));
+}
+// your own rows always show your current paint, other drivers' colour is kept in sync by the server (set_color)
+function liveCol(x) { return (x.pid === ACCT.pub ? CFG.color : x.color) || '#888'; }
+async function loadWR() {
+  const my = ++LBSEQ, res = await LB.wrs(); if (my !== LBSEQ) return;
+  $('lbHead').innerHTML = (res.live ? '<span class="live"></span> Live · global' : (res.err ? '⚠ Leaderboard server unreachable · showing this device' : 'This device')) + ' · world records held across all tracks';
+  $('lbTable').innerHTML = '<tr><th>POS</th><th>DRIVER</th><th>WRS</th><th>TRACKS</th></tr>' + (res.rows.length ? res.rows.map((x, i) => `<tr class="${x.pid === ACCT.pub ? 'me' : ''}"><td class="pos">${i + 1}</td><td><i style="background:${esc(liveCol(x))}"></i>${esc(x.name)}</td><td><b>${x.n}</b></td><td style="color:#a9a9b3">${x.tracks.map(esc).join(', ')}</td></tr>`).join('') : '<tr><td colspan="4" style="color:#8b8b93;padding:22px">No world records yet. Set a lap in Time trial.</td></tr>');
 }
 function refreshAcct() {
   if (!ACCT.key) return; $('acctOut').classList.toggle('hidden', ACCT.reg); $('acctIn').classList.toggle('hidden', !ACCT.reg);
@@ -73,6 +81,7 @@ function buildMenu() {
     g.fillStyle = '#0e0e10'; g.fillRect(0, 0, 200, 120); g.translate(10, 10); g.scale(s, s); g.lineJoin = 'round'; pathTrack(g, tr); g.strokeStyle = '#ff2a2a'; g.lineWidth = Math.max(tr.w + 80, 8 / s); g.shadowColor = '#ff2a2a'; g.shadowBlur = 14; g.stroke(); g.shadowBlur = 0; g.strokeStyle = '#1c1c20'; g.lineWidth = Math.max(tr.w + 10, 3 / s); g.stroke();
     const sp = document.createElement('span'); sp.textContent = t.name; d.appendChild(c); d.appendChild(sp); d.onclick = () => { CFG.track = i; saveCfg(); refreshMenu(); }; $('tracks').appendChild(d);
     const b = document.createElement('button'); b.className = 'opt'; b.dataset.lbt = i; b.textContent = t.name; b.onclick = () => { LBT = i; loadLB(); }; $('lbTracks').appendChild(b); });
+  { const b = document.createElement('button'); b.className = 'opt wrb'; b.dataset.lbt = 'wr'; b.textContent = '🏆 Total WRs'; b.onclick = () => { LBT = 'wr'; loadLB(); }; $('lbTracks').appendChild(b); }
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { CFG.mode = b.dataset.mode; saveCfg(); refreshMenu(); });
   document.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { CFG.laps = +b.dataset.l; saveCfg(); refreshMenu(); });
   $('nameIn').onclick = () => { setTab('acct'); if (ACCT.reg) $('acctName').focus(); else $('regName').focus(); };
@@ -186,7 +195,7 @@ function renderBinds() {
   $('binds').innerHTML = BIND_ACTIONS.map(([a, l]) => `<div class="bind"><span>${l}</span><button class="opt kb${BINDING === a ? ' wait' : ''}" data-a="${a}">${BINDING === a ? 'PRESS A KEY…' : esc(keyName(CFG.keys[a]))}</button></div>`).join('');
   $('binds').querySelectorAll('[data-a]').forEach(b => b.onclick = () => { BINDING = b.dataset.a; b.blur(); renderBinds(); });
 }
-const GFX_OPTS = [['res', 'Resolution', [['sharp', 'Sharp'], ['balanced', 'Balanced'], ['fast', 'Fast'], ['retro', 'Retro']]], ['gates', 'Checkpoint gates', [[1, 'On'], [0, 'Off']]], ['smoke', 'Tyre smoke', [[1, 'On'], [0, 'Off']]], ['skids', 'Skid marks', [[1, 'On'], [0, 'Off']]], ['weather', 'Weather (snow)', [[1, 'On'], [0, 'Off']]], ['vignette', 'Vignette', [[1, 'On'], [0, 'Off']]], ['fps', 'FPS counter', [[0, 'Off'], [1, 'On']]]];
+const GFX_OPTS = [['res', 'Resolution', [['sharp', 'Sharp'], ['balanced', 'Balanced'], ['fast', 'Fast'], ['retro', 'Retro']]], ['gates', 'Checkpoint gates', [[1, 'On'], [0, 'Off']]], ['smoke', 'Drift particles (smoke)', [[1, 'On'], [0, 'Off']]], ['skids', 'Skid marks', [[1, 'On'], [0, 'Off']]], ['weather', 'Weather (snow)', [[1, 'On'], [0, 'Off']]], ['vignette', 'Vignette', [[1, 'On'], [0, 'Off']]], ['fps', 'FPS counter', [[0, 'Off'], [1, 'On']]]];
 function renderGfx() {
   $('gfx').innerHTML = GFX_OPTS.map(([k, l, o]) => `<div class="bind"><span>${l}</span><div class="row">${o.map(([v, n]) => `<button class="opt${CFG.gfx[k] == v ? ' on' : ''}" data-g="${k}" data-v="${v}">${n}</button>`).join('')}</div></div>`).join('');
   $('gfx').querySelectorAll('[data-g]').forEach(b => b.onclick = () => { const v = b.dataset.v; CFG.gfx[b.dataset.g] = isNaN(+v) ? v : +v; applyGfx(); saveCfg(); renderGfx(); });
@@ -215,9 +224,9 @@ async function raceGhost(tr, row, btn) {
   if (G.state !== 'menu' || !row) return; let rep = null; if (btn) btn.textContent = '…';
   if (CLOUD) { try { const r = await sb('GET', `laps?track=eq.${tr}&pid=eq.${encodeURIComponent(row.pid)}&select=replay,lap_ms`); if (r && r[0] && r[0].lap_ms === row.lap) rep = r[0].replay; } catch (e) { } }
   if (!decRep(rep) && row.pid === ACCT.pub) rep = localStorage.getItem('md_rep_' + tr);
-  if (btn) btn.textContent = 'Ghost';
+  if (btn) btn.textContent = 'Race against ghost';
   if (!decRep(rep)) return alert('There is no ghost for this lap yet. Ghosts are saved with new personal bests from now on.');
-  G.ghostPick = { rep, name: row.name, color: row.color, body: row.body }; CFG.track = tr; G.plist = []; startSession({ track: tr, laps: 0, mode: 'tt' }, null, false);
+  G.ghostPick = { rep, name: row.name, color: liveCol(row), body: row.body, wr: row === LBROWS[0], own: row.pid === ACCT.pub }; CFG.track = tr; G.plist = []; startSession({ track: tr, laps: 0, mode: 'tt' }, null, false);
 }
 
 // ===== custom dropdowns: replaces the browser's native <select> look, keeps the real select underneath =====

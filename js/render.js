@@ -35,19 +35,17 @@ function renderInner(dt, me) {
   if (CFG.gfx.fps) { G.fps = (G.fps || 60) * 0.94 + (1 / Math.max(dt, 1e-3)) * 0.06; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.font = '700 12px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText(Math.round(G.fps) + ' FPS', 14, VH - 14); }
 }
 function drawGates(tr) {
-  const me = G.me, live = me && me.lap >= 0, nx = me ? nextGate(me) + 1 : -1, t = performance.now() / 1000, hw = tr.w / 2;
-  ctx.save(); ctx.lineCap = 'round'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '900 18px Segoe UI, system-ui, sans-serif';
+  const me = G.me, live = me && me.lap >= 0, nx = me ? nextGate(me) + 1 : -1, t = performance.now() / 1000, ro = tr.w / 2 + RUNOFF;
+  ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.font = '900 11px Segoe UI, system-ui, sans-serif';
   for (const g of tr.gates) {
-    const p = tr.pts[g.i], a = tr.dirs[g.i], px = -Math.sin(a), py = Math.cos(a), next = live && g.s === nx, done = live && !!(me.gp && me.gp[g.s - 1]);
-    const col = next ? '#ffd400' : done ? '#6b6b73' : '#ff2a2a', al = next ? 0.8 + 0.2 * Math.sin(t * 7) : done ? 0.35 : 0.8;
-    ctx.globalAlpha = al * 0.6; ctx.strokeStyle = col; ctx.lineWidth = 7; ctx.setLineDash([22, 16]);
-    ctx.beginPath(); ctx.moveTo(p[0] - px * hw, p[1] - py * hw); ctx.lineTo(p[0] + px * hw, p[1] + py * hw); ctx.stroke(); ctx.setLineDash([]);
-    ctx.globalAlpha = al;
+    const p = tr.pts[g.i], a = tr.dirs[g.i], px = -Math.sin(a), py = Math.cos(a), fx = Math.cos(a), fy = Math.sin(a), next = live && g.s === nx, done = live && !!(me.gp && me.gp[g.s - 1]);
+    const col = done ? '#7a776c' : '#ffd400';
+    if (next) { ctx.globalAlpha = 0.22 + 0.1 * Math.sin(t * 7); ctx.strokeStyle = '#ffd400'; ctx.lineWidth = 6; ctx.setLineDash([20, 18]); ctx.beginPath(); ctx.moveTo(p[0] - px * ro, p[1] - py * ro); ctx.lineTo(p[0] + px * ro, p[1] + py * ro); ctx.stroke(); ctx.setLineDash([]); }
     for (const sd of [-1, 1]) {
-      const x = p[0] + px * (hw + 18) * sd, y = p[1] + py * (hw + 18) * sd;
-      if (next) { ctx.fillStyle = 'rgba(255,212,0,.25)'; ctx.beginPath(); ctx.arc(x, y, 26 + 4 * Math.sin(t * 7), 0, 7); ctx.fill(); }
-      ctx.fillStyle = '#0b0b0d'; ctx.beginPath(); ctx.arc(x, y, 17, 0, 7); ctx.fill(); ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, 13, 0, 7); ctx.fill();
-      ctx.fillStyle = '#0b0b0d'; ctx.fillText(g.s, x, y + 1);
+      const cx = p[0] + px * ro * sd, cy = p[1] + py * ro * sd;
+      if (next) { ctx.globalAlpha = 0.3 + 0.15 * Math.sin(t * 7); ctx.fillStyle = '#ffd400'; ctx.beginPath(); ctx.arc(cx, cy, 34, 0, 7); ctx.fill(); }
+      ctx.globalAlpha = done ? 0.6 : 1; drawTyreRow(ctx, cx, cy, fx, fy, col);
+      const lx = cx + px * sd * 22, ly = cy + py * sd * 22; ctx.fillStyle = '#0b0b0d'; ctx.beginPath(); ctx.arc(lx, ly, 9, 0, 7); ctx.fill(); ctx.fillStyle = col; ctx.fillText(g.s, lx, ly + 1);
     }
   }
   ctx.restore();

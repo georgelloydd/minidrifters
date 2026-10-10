@@ -38,7 +38,7 @@ function startSession(cfg, grid, mp, rid) {
   for (const s of ['menu', 'lobby', 'board']) $(s).classList.add('hidden');
   for (const s of ['hud', 'speedo', 'mini']) $(s).classList.remove('hidden');
   $('hLap').style.display = cfg.laps || G.tt ? '' : 'none'; $('hKeys').classList.toggle('hidden', !G.tt); $('hKeys').textContent = keyName(CFG.keys.reset) + ' restart lap · ' + keyName(CFG.keys.cp) + ' last checkpoint · ESC end session'; $('hTime').querySelector('small').textContent = G.tt ? 'LAP TIME' : 'TIME'; $('hPos').style.display = G.rem.size ? '' : 'none';
-  G.state = 'countdown'; G.cdEnd = performance.now() + (cfg.laps || G.tt ? 3200 : 600); G.t0 = G.cdEnd; buildMini();
+  G.state = 'countdown'; G.cdEnd = performance.now() + (cfg.laps ? 3200 : G.tt ? 0 : 600); G.t0 = G.cdEnd; buildMini();
   sndInit();
 }
 function segOf(i) { const g = G.tr.gates; let s = 0; while (s < g.length && g[s].i <= i) s++; return s; }
@@ -106,7 +106,7 @@ function tickInner(ts, bg) {
   const now = performance.now(), dt = Math.min(bg ? 0.5 : 0.05, (ts - (G.last || ts)) / 1000); G.last = ts;
   if (G.state === 'menu' || G.state === 'lobby') { if (!bg) renderAttract(dt); return; }
   const me = G.me, racing = G.state === 'race';
-  if (G.state === 'countdown') { const left = G.cdEnd - now; banner(left > 0 ? (G.cfg.laps || G.tt ? String(Math.ceil(left / 1000)) : '') : ''); if (left <= 0) { G.state = 'race'; if (G.tt) G.tt.start = now; if (G.cfg.laps || G.tt) { banner('GO!'); setTimeout(() => { if ($('banner').textContent === 'GO!') banner(''); }, 900); } } }
+  if (G.state === 'countdown') { const left = G.cdEnd - now; banner(left > 0 ? (G.cfg.laps ? String(Math.ceil(left / 1000)) : '') : ''); if (left <= 0) { G.state = 'race'; if (G.tt) G.tt.start = now; if (G.cfg.laps) { banner('GO!'); setTimeout(() => { if ($('banner').textContent === 'GO!') banner(''); }, 900); } } }
   G.acc += dt; let inp = inputs();
   if (!racing) inp = { hb: true }; else if (me.finished) inp = { down: me.vF > 30 };
   while (G.acc >= STEP) { G.acc -= STEP; me.px = me.x; me.py = me.y; me.pa = me.a; const ox = me.x, oy = me.y, nr = stepCar(me, inp, STEP, G.tr); if (racing && !me.finished) { const tn = performance.now(); gateCross(me, ox, oy, tn); progress(me, nr.i, tn); } }
@@ -180,8 +180,8 @@ function applySpawn(c) {
 // ---------- ghosts ----------
 function setGhost(rep, pick) {
   const L = decRep(rep); G.ghost = L; G.ghostCar = null; if (!L) return;
-  const gc = newCar(0, G.tr, 'ghost', pick ? pick.name + ' (ghost)' : 'PB ghost', (pick && pick.color) || CFG.color);
-  Object.assign(gc, carLook(pick ? { name: pick.name, color: pick.color || '#888888', body: pick.body } : CFG)); gc.finished = 1; gc.own = !pick; G.ghostCar = gc;
+  const gc = newCar(0, G.tr, 'ghost', !pick || pick.own ? 'PB' : pick.name + (pick.wr ? ' [WR]' : ''), (pick && pick.color) || CFG.color);
+  Object.assign(gc, carLook(pick && !pick.own ? { name: pick.name, color: pick.color || '#888888', body: pick.body } : CFG)); gc.finished = 1; gc.own = !pick; G.ghostCar = gc;
 }
 function ghostCars() {
   const gc = G.ghostCar, L = G.ghost, me = G.me; if (!gc || !L || G.state !== 'race' || !me || me.lap < 0 || me.finished) return [];

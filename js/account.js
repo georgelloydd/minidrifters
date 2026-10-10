@@ -41,7 +41,12 @@ const ACCT = {
   data() { return { cfg: Object.assign({ name: CFG.name }, carLook(CFG)), stats: this.stats, reg: this.reg }; },
   save(localOnly) {
     if (!this.key) return; localStorage.setItem('md_acct_' + this.key, JSON.stringify(this.data()));
-    if (CLOUD && this.reg && !localOnly) { clearTimeout(this._t); this._t = setTimeout(() => sb('POST', 'profiles', { id: this.priv, data: this.data(), updated_at: new Date().toISOString() }, 'resolution=merge-duplicates,return=minimal').catch(() => { }), 800); }
+    if (CLOUD && this.reg && !localOnly) { clearTimeout(this._t); this._t = setTimeout(() => sb('POST', 'profiles', { id: this.priv, data: this.data(), updated_at: new Date().toISOString() }, 'resolution=merge-duplicates,return=minimal').catch(() => { }), 800); this.syncColor(); }
+  },
+  // push a paint change onto every leaderboard time this player owns, so all tables show the new colour
+  syncColor() {
+    const k = 'md_colsync_' + this.key; if (!CLOUD || !this.reg || localStorage.getItem(k) === CFG.color) return;
+    clearTimeout(this._ct); this._ct = setTimeout(() => sb('POST', 'rpc/set_color', { p_key: this.key, p_color: CFG.color }).then(() => localStorage.setItem(k, CFG.color)).catch(() => { }), 1200);
   },
   backup() { return 'MDB1.' + btoa(unescape(encodeURIComponent(JSON.stringify({ k: this.key, d: this.data() })))); },
   async restore(text) {
@@ -62,7 +67,8 @@ const ACCT = {
     if (name.length < 2) throw new Error('Pick a driver name (2 to 14 characters).');
     if (/^driver\d*$/i.test(name)) throw new Error('"Driver" is the guest name. Pick something else.');
     const low = name.toLowerCase();
-    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!k.startsWith('md_acct_') || k === 'md_acct_' + this.key) continue;
+    // offline only: online the server is the source of truth (old/changed keys saved on this device made your own old names look taken)
+    if (!CLOUD)     for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (!k.startsWith('md_acct_') || k === 'md_acct_' + this.key) continue;
       try { const d = JSON.parse(localStorage.getItem(k) || 'null'); if (d && d.reg && d.cfg && String(d.cfg.name || '').toLowerCase() === low) throw new Error('Someone already has that name. Try another one.'); } catch (e) { if (/already/.test(e.message)) throw e; } }
     if (!CLOUD) return name;
     let free = null;
@@ -155,6 +161,13 @@ const LB = {
     else this.warned = false;
     if (okAny && typeof TAB !== 'undefined' && TAB === 'lb' && typeof loadLB === 'function' && G.state === 'menu') loadLB();
     if (Object.keys(this.pend()).length && !failed) this.flush();
+  },
+  async wrs() {
+    const T = TRACKS.map((t, i) => i).filter(i => !TRACKS[i].test), by = {}; let live = !!CLOUD, err = false, tops;
+    if (CLOUD) { try { tops = await Promise.all(T.map(i => sb('GET', `laps?track=eq.${i}&select=pid,name,color,lap_ms&order=lap_ms.asc&limit=1`).then(r => r && r[0] ? { pid: r[0].pid, name: r[0].name, color: r[0].color } : null))); } catch (e) { live = false; err = true; } }
+    if (!tops) tops = T.map(i => { const r = this.localGet(i).slice().sort((x, y) => x.lap - y.lap)[0]; return r ? { pid: r.pid, name: r.name, color: r.color } : null; });
+    tops.forEach((r, j) => { if (!r) return; const e = by[r.pid] || (by[r.pid] = { pid: r.pid, name: r.name, color: r.color, n: 0, tracks: [] }); e.n++; e.tracks.push(TRACKS[T[j]].name); });
+    return { live, err, rows: Object.values(by).sort((x, y) => y.n - x.n || x.name.localeCompare(y.name)).slice(0, 20) };
   },
   async top(tr) {
     if (!CLOUD) return { live: false, rows: this.localGet(tr).slice(0, 10) };
