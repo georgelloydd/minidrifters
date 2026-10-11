@@ -228,41 +228,15 @@ body.touch #hud{top:calc(64px + env(safe-area-inset-top))}
 
 #lbTable canvas.lbcar{width:48px;height:30px;vertical-align:middle;margin:-6px 8px -6px -4px}
 
-/* ===== garage / shop redesign + in-game dialogs ===== */
-:root{--pix:'Silkscreen','Press Start 2P',ui-monospace,'Courier New',monospace;--navy:#0b0f20;--navy2:#141a33;--nline:#232a4a;--cyan:#1ec8ff;--pink:#ff2a6d;--gold:#ffd60a}
+/* ===== in-game dialogs + coins ===== */
+:root{--pix:'Segoe UI',system-ui,-apple-system,Roboto,sans-serif;--navy:#0b0f20;--navy2:#141a33;--nline:#232a4a;--cyan:#1ec8ff;--pink:#ff2a6d;--gold:#ffd60a}
 #pops{z-index:2147483600}
-#tab-garage h1{font-family:var(--pix);letter-spacing:3px;text-shadow:0 0 14px rgba(255,42,109,.55),2px 2px 0 #000}
 .coinBar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:linear-gradient(90deg,#1d1806,#0b0f20);border:2px solid #5a4a10;border-radius:6px;padding:9px 14px;margin:0 0 16px;font-family:var(--pix);color:var(--gold);box-shadow:0 0 18px rgba(255,214,10,.08)}
 .coinBar b{font-size:20px;letter-spacing:1px;text-shadow:2px 2px 0 #000}.coinBar span{font-size:12px;letter-spacing:1px;text-transform:uppercase}
 .coinBar small{flex-basis:100%;font-family:'Segoe UI',system-ui,sans-serif;color:#9aa0b8;font-size:12px}
 @media(min-width:900px){.coinBar small{flex-basis:auto;margin-left:auto}}
 .coin{display:inline-block;width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3a8 0 18%,#ffcf1f 20% 58%,#c48a00 62%);box-shadow:inset 0 0 0 1.5px #8a5e00,0 1px 0 #000;vertical-align:-2px;margin-right:5px;flex:none}
 .coin.big{width:20px;height:20px}
-.stage{background:radial-gradient(circle at 50% 42%,#1d2858,#0b0f20 72%);border:2px solid var(--nline);border-radius:8px;box-shadow:inset 0 0 40px rgba(30,200,255,.06)}
-.stage canvas{image-rendering:pixelated}
-.stage p{color:#c9cde0;text-align:left;padding:4px 8px 6px;line-height:1.7}
-.gName{font-family:var(--pix);font-size:16px;letter-spacing:1px;color:#fff;text-transform:uppercase;text-shadow:2px 2px 0 #000}
-.gTxt{color:#9aa0b8;font-size:13px}
-.tier{display:inline-block;margin-left:8px;padding:1px 7px;border:2px solid currentColor;border-radius:3px;font-family:var(--pix);font-size:10px;letter-spacing:1px;text-transform:uppercase;vertical-align:2px;color:#9aa0b8}
-.t-starter{color:#7bff4a}.t-common{color:#c9cde0}.t-rare{color:var(--cyan)}.t-epic{color:#c04bff}.t-legendary{color:var(--pink);box-shadow:0 0 10px rgba(255,42,109,.35)}
-#types{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.ty{position:relative;background:linear-gradient(160deg,var(--navy2),var(--navy) 72%);border:2px solid var(--nline);border-radius:6px;padding:0 0 9px;text-align:left;overflow:hidden;color:#e6e9f5;letter-spacing:0;transition:transform .12s,border-color .12s,box-shadow .12s}
-.ty::before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(135deg,transparent 0 14px,rgba(255,255,255,.025) 14px 16px);pointer-events:none}
-.ty:hover{transform:translateY(-2px);border-color:#3c4884;box-shadow:0 8px 18px rgba(0,0,0,.45)}
-.ty canvas{width:100%;display:block;image-rendering:pixelated;margin:-2px 0 2px}
-.ty.on{border-color:var(--cyan);background:linear-gradient(160deg,#0f2a4a,#0a1428 72%);box-shadow:0 0 0 1px var(--cyan),0 0 18px rgba(30,200,255,.35);color:#fff}
-.ty.locked{opacity:1}.ty.locked::after{content:none}
-.ty.locked canvas{filter:saturate(.8) brightness(.82)}
-.ty[data-tier=legendary]{border-color:#5c1d3c}.ty[data-tier=legendary]:hover{border-color:var(--pink);box-shadow:0 0 16px rgba(255,42,109,.35)}
-.ty[data-tier=legendary].on{border-color:var(--pink)}
-.tyTop{position:relative;display:flex;align-items:center;gap:6px;padding:7px 8px 0;height:24px;font-family:var(--pix);font-size:12px;color:var(--gold);text-shadow:1px 1px 0 #000;z-index:1}
-.tyLock{display:none;position:relative;width:10px;height:8px;margin-top:5px;background:#cfd3dc;border-radius:1px;box-shadow:1px 1px 0 #000}
-.tyLock::before{content:'';position:absolute;left:2px;top:-5px;width:4px;height:5px;border:2px solid #cfd3dc;border-bottom:0;border-radius:4px 4px 0 0}
-.ty.locked .tyLock{display:block}
-.ty:not(.locked) .tyPrice{color:#7bff4a;font-size:10px;letter-spacing:1px;text-transform:uppercase}.ty.on .tyPrice{color:var(--cyan)}
-.tyName{position:relative;padding:0 9px;font-family:var(--pix);font-size:11px;letter-spacing:1px;text-transform:uppercase;text-shadow:1px 1px 0 #000;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tyTier{position:absolute;right:8px;top:9px;font-family:var(--pix);font-size:8px;letter-spacing:1px;text-transform:uppercase;color:#6b7290}
-.ty[data-tier=rare] .tyTier{color:var(--cyan)}.ty[data-tier=epic] .tyTier{color:#c04bff}.ty[data-tier=legendary] .tyTier{color:var(--pink)}.ty[data-tier=starter] .tyTier{color:#7bff4a}
 /* dialogs */
 .dlgOv{position:fixed;inset:0;z-index:2147483000;background:rgba(4,6,14,.72);backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;animation:dlgIn .15s ease-out;user-select:text;transition:opacity .15s}
 .dlgOv.out{opacity:0}
@@ -287,3 +261,34 @@ body.touch #hud{top:calc(64px + env(safe-area-inset-top))}
 .buyRow:last-child b{color:#fff}
 @keyframes dlgPop{from{transform:scale(.9);opacity:0}}
 @keyframes dlgIn{from{opacity:0}}
+
+/* ===== shop tab ===== */
+.shH{margin:24px 0 10px;font-size:15px;letter-spacing:2px;text-transform:uppercase;color:#fff;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.shH small{font-size:12px;color:#8a90a8;letter-spacing:0;text-transform:none;font-weight:400}
+.shGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}
+.shGrid.sm{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.shCard{position:relative;display:flex;flex-direction:column;gap:6px;background:linear-gradient(165deg,var(--navy2),var(--navy) 75%);border:1px solid var(--nline);border-radius:10px;padding:12px;transition:transform .12s,border-color .12s,box-shadow .12s}
+.shCard:hover{transform:translateY(-2px);border-color:#3c4884;box-shadow:0 10px 22px rgba(0,0,0,.4)}
+.shCard.own{border-color:#25503a}
+.shCard.eq{border-color:var(--cyan);box-shadow:inset 0 0 0 1px var(--cyan),0 0 16px rgba(30,200,255,.18)}
+.shCard canvas{width:100%;display:block;border-radius:7px;background:radial-gradient(circle at 50% 45%,#1d2858,#0b0f20 75%)}
+.shCard b{font-size:15px;color:#fff}
+.shCard .dim{font-size:12px;color:#8a90a8;line-height:1.35;min-height:32px}
+.shBtn{margin-top:auto;padding:9px 12px;border-radius:7px;border:1px solid #8a6a00;background:linear-gradient(#ffe14a,#ffc400);color:#1a1300;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:2px;font-family:inherit}
+.shBtn:hover{filter:brightness(1.08)}
+.shBtn.poor{background:#1a2040;border-color:#2b3566;color:#8a90a8}
+.shBtn.own{background:#12301f;border-color:#2c6b46;color:#7bff9a}
+.shBtn.eq{background:#0f2a4a;border-color:var(--cyan);color:var(--cyan)}
+.shSw{height:64px;border-radius:7px;border:1px solid rgba(255,255,255,.12)}
+.shSw.rainbow{background:linear-gradient(90deg,#ff3b3b,#ffd60a,#7bff4a,#1ec8ff,#c04bff,#ff3fb4)}
+.shPaint{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.shCustom .row{display:flex;gap:8px;align-items:center}
+.shCustom input[type=color]{width:44px;height:36px;padding:0;border:none;background:none;cursor:pointer}
+.shCustom .hex{flex:1;min-width:0}
+.shSwatches{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-top:12px}
+.shSwatches .shCard{padding:9px}.shSwatches .shSw{height:40px}.shSwatches b{font-size:13px;font-family:ui-monospace,monospace}
+.shGlow{height:46px;border-radius:7px;background:#0b0f20;position:relative;overflow:hidden}
+.shGlow::after{content:'';position:absolute;left:18%;right:18%;bottom:8px;height:12px;border-radius:50%;background:var(--c);filter:blur(7px)}
+.shSmoke{height:46px;border-radius:7px;background:radial-gradient(circle at 30% 60%,var(--c) 0 16%,transparent 42%),radial-gradient(circle at 62% 45%,var(--c) 0 20%,transparent 48%),#0b0f20}
+#shopRoot .coinBar{margin-bottom:4px}
+.toShop{opacity:.85}

@@ -17,8 +17,7 @@
 <meta property="og:title" content="Mini Drifters">
 <meta property="og:description" content="A free top-down drift racing game in your browser.">
 <meta property="og:image" content="https://georgelloydd.github.io/minidrifters/icon-512.png">
-<link rel="stylesheet" href="style.css?v=20261011100032">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=20261011112500">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -44,6 +43,7 @@
     <button class="nv on" data-tab="tt">Time Trial</button>
     <button class="nv" data-tab="mp">Multiplayer</button>
     <button class="nv" data-tab="garage">Garage</button>
+    <button class="nv" data-tab="shop">Shop</button>
     <button class="nv" data-tab="lb">Leaderboards</button>
     <button class="nv" data-tab="acct">Account</button>
     <button class="nv" data-tab="settings">Settings</button>
@@ -77,13 +77,17 @@
         <div class="stage"><canvas id="gPrev" width="440" height="300"></canvas><p id="gDesc"></p></div>
         <div class="gopts">
           <label>Driver name <input id="nameIn" maxlength="14" readonly title="Change your name in Account" style="cursor:pointer"></label>
-          <label>Paint <small class="dim">· pick a swatch or type any hex code</small></label><div id="paints"></div>
+          <label>Paint <small class="dim">· your colours, buy more in the Shop</small></label><div id="paints"></div>
           <label>Finish</label><div class="row" id="finishes"></div>
-          <label>Car type <small class="dim">· cosmetic, all cars handle the same</small></label><div id="types"></div>
+          <label>Car type <small class="dim">· the cars you own</small></label><div id="types"></div>
           <label>Livery <small class="dim">· uses your stripe + secondary colours</small></label><div id="livs"></div>
           <label>Race number <input id="numIn" maxlength="2" inputmode="numeric" placeholder="7" style="width:70px"></label>
         </div>
       </div>
+    </section>
+    <section class="tab hidden" id="tab-shop">
+      <h1>SHOP</h1><div class="bar"></div>
+      <div id="shopRoot"></div>
     </section>
     <section class="tab hidden" id="tab-lb">
       <h1>LEADERBOARDS</h1><div class="bar"></div>
@@ -160,19 +164,19 @@
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=20261011100032"></script>
-<script src="js/track.js?v=20261011100032"></script>
-<script src="js/car.js?v=20261011100032"></script>
-<script src="js/cars.js?v=20261011100032"></script>
-<script src="js/net.js?v=20261011100032"></script>
-<script src="js/session.js?v=20261011100032"></script>
-<script src="js/audio.js?v=20261011100032"></script>
-<script src="js/main.js?v=20261011100032"></script>
-<script src="js/dialog.js?v=20261011100032"></script>
-<script src="js/account.js?v=20261011100032"></script>
-<script src="js/render.js?v=20261011100032"></script>
-<script src="js/shop.js?v=20261011100032"></script>
-<script src="js/replay.js?v=20261011100032"></script>
-<script src="js/ui.js?v=20261011100032"></script>
+<script src="js/config.js?v=20261011112500"></script>
+<script src="js/track.js?v=20261011112500"></script>
+<script src="js/car.js?v=20261011112500"></script>
+<script src="js/cars.js?v=20261011112500"></script>
+<script src="js/net.js?v=20261011112500"></script>
+<script src="js/session.js?v=20261011112500"></script>
+<script src="js/audio.js?v=20261011112500"></script>
+<script src="js/main.js?v=20261011112500"></script>
+<script src="js/dialog.js?v=20261011112500"></script>
+<script src="js/account.js?v=20261011112500"></script>
+<script src="js/render.js?v=20261011112500"></script>
+<script src="js/shop.js?v=20261011112500"></script>
+<script src="js/replay.js?v=20261011112500"></script>
+<script src="js/ui.js?v=20261011112500"></script>
 </body>
 </html>
