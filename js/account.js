@@ -34,7 +34,7 @@ const ACCT = {
     else this.stats = blankStats();
     this.reg = !!(data && data.reg); if (!this.reg) CFG.name = GUEST_NAME; loadTweaks();
     this.admV = Math.max((data && data.admV) || 0, (data && data.adm && data.adm.v) || 0);
-    this.save(true); if (CLOUD && this.reg) { this.save(); syncBests(false); this.register(); LB.flush(); }
+    this.save(true); if (CLOUD && this.reg) { this.save(); syncBests(false); this.register(); LB.retryRejected(true); LB.flush(); }
     return !!data;
   },
   // lets the admin dev site look up a forgotten key by player name (needs register_key from supabase-admin.sql; silently skipped if missing)
@@ -139,16 +139,24 @@ async function testOnline() {
 // one row per player per track: the submit_lap function only replaces it when the new lap is faster.
 // Falls back to a plain insert if the upgrade SQL hasn't been run yet.
 async function submitLap(tr, e) {
-  const r = { p_track: +tr, p_pid: e.pid || ACCT.pub, p_name: CFG.name, p_color: CFG.color, p_body: CFG.body, p_lap_ms: Math.round(e.lap), p_score: Math.round(e.score || 0) };
+  // clean every value first: Postgres answers 400 to anything out of range (e.g. a drift score past the int limit) or not valid json
+  const I = 2147483647, toInt = v => Math.max(0, Math.min(I, Math.round(+v || 0)));
+  const base = { p_track: toInt(tr), p_pid: String(e.pid || ACCT.pub).slice(0, 24), p_name: String(CFG.name || 'Driver').slice(0, 14), p_color: isHex(CFG.color) ? CFG.color : '#ff3b3b', p_body: String(CFG.body || 'drift').slice(0, 24), p_lap_ms: toInt(e.lap), p_score: toInt(e.score) };
+  let look = null; try { look = JSON.parse(JSON.stringify(carLook(CFG))); if (!look || JSON.stringify(look).length > 3500) look = null; } catch (er) { look = null; }
+  let rep = typeof e.rep === 'string' ? e.rep : null; try { if (rep && (rep.length > 200000 || !decRep(rep))) rep = null; } catch (er) { rep = null; }
+  const tries = []; if (rep && look) tries.push(Object.assign({ p_replay: rep, p_look: look }, base)); if (rep) tries.push(Object.assign({ p_replay: rep }, base)); if (look && !rep) tries.push(Object.assign({ p_replay: null, p_look: look }, base)); tries.push(base);
   const perm = er => { const m = /\((\d{3})\)/.exec(er.message), s = m ? +m[1] : 0; if (s >= 400 && s < 500 && s !== 408 && s !== 429) er.perm = true; return er; };
-  if (e.rep) { r.p_replay = e.rep; r.p_look = carLook(CFG); try { await sb('POST', 'rpc/submit_lap', r); return; } catch (er) { if (!/\(404\)|PGRST202/.test(er.message)) throw perm(er); delete r.p_look; }
-    try { await sb('POST', 'rpc/submit_lap', r); return; } catch (er) { if (!/\(404\)|PGRST202/.test(er.message)) throw perm(er); delete r.p_replay; } }
-  try { await sb('POST', 'rpc/submit_lap', r); }
-  catch (er) { if (!/\(404\)|PGRST202/.test(er.message)) throw perm(er);
-    // old database without submit_lap: plain insert (a duplicate means the server already has a time for us)
-    try { await sb('POST', 'laps', { track: r.p_track, pid: r.p_pid, name: r.p_name, color: r.p_color, body: r.p_body, lap_ms: r.p_lap_ms, score: r.p_score }); }
-    catch (e2) { if (/\(409\)|23505/.test(e2.message)) { const x = new Error('Run the latest admin SQL in Supabase so faster laps can replace old ones.'); x.perm = true; throw x; } throw perm(e2); } }
+  const soft = er => /\((400|404|422)\)|PGRST20[23]|22P02|22003|23514/.test(er.message); // bad/unknown argument: try a simpler call instead of giving up
+  let last = null, missing = true;
+  for (const r of tries) { try { await sb('POST', 'rpc/submit_lap', r); if (r !== tries[0]) console.warn('[Supabase] lap uploaded without some extras after:', last && last.message); return; }
+    catch (er) { last = er; if (!/\(404\)|PGRST202/.test(er.message)) missing = false; if (!soft(er)) throw perm(er); } }
+  if (!missing) throw perm(last);
+  // old database without submit_lap: plain insert (a duplicate means the server already has a time for us)
+  try { await sb('POST', 'laps', { track: base.p_track, pid: base.p_pid, name: base.p_name, color: base.p_color, body: base.p_body, lap_ms: base.p_lap_ms, score: base.p_score }); }
+  catch (e2) { if (/\(409\)|23505/.test(e2.message)) { const x = new Error('Run the latest admin SQL in Supabase so faster laps can replace old ones.'); x.perm = true; throw x; } throw perm(e2); }
 }
+// the ghost saved on this device for a lap time, if it matches
+function localRepFor(tr, lap) { const r = localStorage.getItem('md_rep_' + tr), ms = +localStorage.getItem('md_repms_' + tr) || 0; return r && (!ms || Math.abs(ms - lap) <= 1) ? r : null; }
 // push every local best lap up once, so laps set before Supabase was configured still appear
 async function syncBests(force) {
   if (!CLOUD || !ACCT.reg) return 0; let n = 0; const done = JSON.parse(localStorage.getItem('md_synced_' + ACCT.key) || '{}');
@@ -164,6 +172,10 @@ const LB = {
     L.sort((a, b) => a.lap - b.lap); localStorage.setItem('md_lb_' + tr, JSON.stringify(L.slice(0, 50)));
     if (CLOUD && ACCT.reg) this.queue(tr, rep ? Object.assign({ rep }, e) : e); // guests: this device only, never sent to Supabase
   },
+  // laps that were refused get another go (on start-up once per build, or when you tap 'retry' on the leaderboard)
+  retryRejected(once) { if (!CLOUD || !ACCT.reg) return 0; const fk = 'md_rejfix_2_' + ACCT.key; if (once && localStorage.getItem(fk)) return 0; localStorage.setItem(fk, '1');
+    const rj = this.rej(), P = this.pend(); let n = 0; for (const tr in rj) { const lap = rj[tr].lap; if (!lap) continue; if (!P[tr] || lap < P[tr].lap) { P[tr] = { pid: ACCT.pub, lap, score: 0, at: Date.now() }; const rp = localRepFor(tr, lap); if (rp) P[tr].rep = rp; } n++; }
+    localStorage.setItem('md_pending_' + ACCT.key, JSON.stringify(P)); localStorage.removeItem('md_rej_' + ACCT.key); if (n) this.flush(); return n; },
   rej() { return JSON.parse(localStorage.getItem('md_rej_' + ACCT.key) || '{}'); },
   pend() { return JSON.parse(localStorage.getItem('md_pending_' + ACCT.key) || '{}'); },
   queue(tr, e) { const P = this.pend(); if (!P[tr] || e.lap < P[tr].lap) P[tr] = e; localStorage.setItem('md_pending_' + ACCT.key, JSON.stringify(P)); this.flush(); },
@@ -208,7 +220,7 @@ const LB = {
       const mine = Math.round(ACCT.bestLap(tr)), P = this.pend(), srv = rows.find(x => x.pid === ACCT.pub);
       if (ACCT.reg && mine && !TRACKS[tr].test && (!srv || mine < srv.lap) && (r.length < 100 || mine <= r[r.length - 1].lap_ms)) {
         const rj = this.rej()[tr], bad = rj && rj.lap === mine;
-        if (!P[tr] && !bad) this.queue(tr, { pid: ACCT.pub, lap: mine, score: 0 });
+        if (!P[tr] && !bad) { const q = { pid: ACCT.pub, lap: mine, score: 0 }, rp = localRepFor(tr, mine); if (rp) q.rep = rp; this.queue(tr, q); }
         const me = { pid: ACCT.pub, name: CFG.name, color: CFG.color, body: CFG.body, lap: mine, at: Date.now(), pending: !bad, failed: bad ? rj.why : '' };
         const i = rows.indexOf(srv); if (i >= 0) rows.splice(i, 1); rows.push(me); rows.sort((a, b) => a.lap - b.lap); }
       await lbLooks(rows.slice(0, 10)); return { live: true, rows: rows.slice(0, 10) };
