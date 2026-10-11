@@ -6,7 +6,6 @@ function msg(id, t) { if (id === 'joinMsg') id = { mp: 'joinMsg' }[TAB] || 'ttMs
 function refreshMenu() {
   if (typeof shopFix === 'function') shopFix();
   if (CFG.mode !== 'race' && CFG.mode !== 'drift' && CFG.mode !== 'tandem') CFG.mode = 'race'; // host-room mode; time trial has its own tab
-  $('nameIn').value = CFG.name;
   document.querySelectorAll('.prow').forEach(r => { const f = r.dataset.f, v = CFG[f]; r.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', s.dataset.c.toLowerCase() === String(v).toLowerCase())); const ci = r.querySelector('input[type=color]'), hi = r.querySelector('.hex'); ci.value = v; if (document.activeElement !== hi) { hi.value = v.toUpperCase(); hi.classList.remove('bad'); } });
   document.querySelectorAll('[data-fin]').forEach(s => s.classList.toggle('on', s.dataset.fin === CFG.finish)); if (document.activeElement !== $('numIn')) $('numIn').value = CFG.num;
   document.querySelectorAll('.lvt').forEach(s => { s.classList.toggle('on', s.dataset.lv === CFG.livery); drawCarPreview(s.querySelector('canvas'), Object.assign(carLook(CFG), { livery: s.dataset.lv }), -0.35); });
@@ -72,7 +71,7 @@ function renderServers(list) {
 function buildMenu() {
   document.querySelectorAll('.nv').forEach(b => b.onclick = () => setTab(b.dataset.tab)); $('chip').onclick = () => setTab('acct');
   Object.assign(CFG, carLook(CFG));
-  const PAINT = [['color', 'Body', COLORS], ['accent', 'Stripes', ['#ffffff', '#111111', '#ffd400', '#ff2a2a', '#00e0ff', '#ff7a00', '#7bff4a', '#c04bff']], ['accent2', 'Secondary', ['#111111', '#ffffff', '#ff2a2a', '#ffd400', '#2b6bff', '#c0c0c0', '#00b37a', '#ff4fa3']], ['helmet', 'Helmet', ['#ffd60a', '#ffffff', '#ff2a2a', '#1ec8ff', '#111111', '#7bff4a', '#ff7a00', '#c04bff']], ['rim', 'Wheels', ['#c9ccd2', '#1a1a1c', '#d4a838', '#ffffff', '#ff2a2a', '#3a7bff', '#7a7f88', '#e0b98a']]];
+  const PAINT = [['color', 'Primary', COLORS], ['accent2', 'Secondary', ['#111111', '#ffffff', '#ff2a2a', '#ffd400', '#2b6bff', '#c0c0c0', '#00b37a', '#ff4fa3']], ['accent', 'Secondary · stripe', ['#ffffff', '#111111', '#ffd400', '#ff2a2a', '#00e0ff', '#ff7a00', '#7bff4a', '#c04bff']], ['helmet', 'Helmet', ['#ffd60a', '#ffffff', '#ff2a2a', '#1ec8ff', '#111111', '#7bff4a', '#ff7a00', '#c04bff']], ['rim', 'Wheels', ['#c9ccd2', '#1a1a1c', '#d4a838', '#ffffff', '#ff2a2a', '#3a7bff', '#7a7f88', '#e0b98a']]];
   for (const [f, label, sw] of PAINT) {
     const r = document.createElement('div'); r.className = 'prow'; r.dataset.f = f; r.innerHTML = `<b>${label}</b><div class="sws"></div><input type="color" title="Colour picker"><input class="hex" maxlength="7" spellcheck="false" title="Hex code, e.g. #FF2A2A">`;
     const set = v => { CFG[f] = v.toLowerCase(); saveCfg(); refreshMenu(); };
@@ -93,7 +92,6 @@ function buildMenu() {
   for (const [k, t] of [['dist', '🛣 Furthest driven'], ['drift', '💨 Drift points']]) { const b = document.createElement('button'); b.className = 'opt wrb'; b.dataset.lbt = k; b.textContent = t; b.onclick = () => { LBT = k; loadLB(); }; $('lbTracks').appendChild(b); }
   document.querySelectorAll('[data-mode]').forEach(b => b.onclick = () => { CFG.mode = b.dataset.mode; saveCfg(); refreshMenu(); });
   document.querySelectorAll('[data-l]').forEach(b => b.onclick = () => { CFG.laps = +b.dataset.l; saveCfg(); refreshMenu(); });
-  $('nameIn').onclick = () => { setTab('acct'); if (ACCT.reg) $('acctName').focus(); else $('regName').focus(); };
   $('bTest').onclick = async () => { $('onStatus').textContent = 'Testing…'; const r = await testOnline(); $('onStatus').innerHTML = `<b style="color:${r.ok ? '#7dff9a' : '#ff6b6b'}">${r.ok ? 'Working' : 'Not working'}</b> · ${esc(r.msg)}`; };
   $('bName').onclick = async () => {
     const v = $('acctName').value.trim().replace(/\s+/g, ' ');

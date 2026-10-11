@@ -292,3 +292,46 @@ body.touch #hud{top:calc(64px + env(safe-area-inset-top))}
 .shSmoke{height:46px;border-radius:7px;background:radial-gradient(circle at 30% 60%,var(--c) 0 16%,transparent 42%),radial-gradient(circle at 62% 45%,var(--c) 0 20%,transparent 48%),#0b0f20}
 #shopRoot .coinBar{margin-bottom:4px}
 .toShop{opacity:.85}
+
+
+/* ===== garage + shop: full width, big car on top, black shop cards ===== */
+#tab-garage,#tab-shop{max-width:none}
+.garage{display:flex;flex-direction:column;gap:18px}
+.garage .stage,.shStage{width:100%}
+.garage .stage canvas,.shStage canvas{width:100%;height:auto;max-height:42vh;object-fit:contain}
+.shStage{margin-bottom:16px;background:radial-gradient(ellipse at 50% 45%,#26262b,#0a0a0c 70%);border:1px solid #2a2a30;border-radius:10px;padding:10px;text-align:center}
+.shStage p{margin:4px 0 6px;color:#8a8a94;font-size:13px;display:flex;gap:10px;justify-content:center;align-items:center}
+.gopts{width:100%}
+#types{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+#livs{grid-template-columns:repeat(auto-fill,minmax(120px,1fr))}
+.shCard{background:linear-gradient(165deg,#18181b,#0b0b0d 75%);border:1px solid #2a2a30}
+.shCard:hover{border-color:#4a4a52}
+.shCard canvas{background:radial-gradient(circle at 50% 45%,#26262b,#0a0a0c 75%)}
+.shCard .dim,.shH small{color:#8a8a94}
+.shBtn.poor{background:#141417;border-color:#2a2a30;color:#8a8a94}
+.shBtn.eq{background:#0e1a22}
+.shGlow,.shSmoke{background-color:#0a0a0c}
+.shSmoke{background:radial-gradient(circle at 30% 60%,var(--c) 0 16%,transparent 42%),radial-gradient(circle at 62% 45%,var(--c) 0 20%,transparent 48%),#0a0a0c}
+.coinBar{background:linear-gradient(90deg,#1d1806,#0a0a0c)}
+.buyPrev{background:radial-gradient(circle at 50% 42%,#26262b,#0a0a0c 72%)}
+.shColGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.shColHead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap}
+.shColHead small{color:#ffd60a;font-size:12px}
+.shCol .shSw,.shCol .shGlow,.shCol .shSmoke{height:56px}
+.shCol .row{display:flex;gap:8px;align-items:center}
+.shCol input[type=color]{width:44px;height:36px;padding:0;border:none;background:none;cursor:pointer}
+.shCol .hex{flex:1;min-width:0;font-family:ui-monospace,Consolas,monospace;text-transform:uppercase}
+.shCol .hex.bad{border-color:var(--red);color:#ff8a8a}
+.shCol .shBtn{margin-top:0}
+.shCol .shBtn.one{margin-top:auto}
+.xprow{display:grid;grid-template-columns:96px 1fr auto auto;gap:8px;align-items:center;background:#0e0e10;border:1px solid var(--line);border-radius:6px;padding:7px 9px}
+.xprow b{font-size:11px;letter-spacing:1.2px;text-transform:uppercase;color:#bbb}
+.xprow .sws{display:flex;gap:5px;flex-wrap:wrap}
+.xprow .sw{width:20px;height:20px;border-width:2px}
+.xprow .sw.glw{box-shadow:0 0 8px var(--c,currentColor)}
+.xprow .sw.none{background:linear-gradient(135deg,transparent 45%,#ff3b3b 45% 55%,transparent 55%),#1a1a1e}
+.xprow input[type=color]{width:34px;height:28px;padding:0;border:1px solid var(--line);border-radius:4px;background:none;cursor:pointer}
+.xprow input.hex{width:86px;font-family:ui-monospace,Consolas,monospace;text-transform:uppercase}
+.xprow input.hex.bad{border-color:var(--red);color:#ff8a8a}
+#paints{display:flex;flex-direction:column;gap:6px}
+@media(max-width:700px){.xprow{grid-template-columns:1fr auto auto}.xprow b{grid-column:1/-1}}

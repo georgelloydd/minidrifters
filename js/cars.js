@@ -1,4 +1,4 @@
-// ===== Car types + liveries (cosmetic only: every car uses the same physics in car.js) =====
+// ===== Car types + secondary patterns (cosmetic only: every car uses the same physics in car.js) =====
 const CAR_TYPES = [
   { id: 'drift', name: 'Drift SR', l: 1, w: 1.04, desc: 'Wide arches, front lip, big angle' },
   { id: 'street', name: 'Nissan Silvia', l: 1, w: 1, desc: 'The original all-rounder', s: { r: 6, cab: [-0.06, 0.3, 0.74], lamps: 'slant', lw: 0.7, tail: 'slant', arches: 1, mirrors: 1 } },
