@@ -1,6 +1,6 @@
 // ===== Coins, shop (cars, paint, underglow, tyre smoke) + achievements =====
 const SHOP = {
-  cars: { drift: 0, street: 1500, hatch: 2000, kei: 2500, rally: 4000, muscle: 5000, gt: 7500, f1: 12000 },
+  cars: { drift: 0, micro: 800, kart: 1200, street: 1500, minnow: 2000, bug: 2200, kei: 2500, hachi: 3000, camper: 3500, pickup: 3500, muscle: 5000, pony: 5500, msedan: 6000, rotary: 6500, flat6: 7000, rspec: 8000, hellkat: 9000, f1: 12000, wedge: 15000 },
   paintFree: ['#ff3b3b', '#f2f2f2', '#33363d', '#1ec8ff'], paintCost: 400, anyPaint: 3000,
   glow: [['#ff2a2a', 'Red'], ['#1ec8ff', 'Ice'], ['#7bff4a', 'Toxic'], ['#c04bff', 'Violet'], ['#ffd60a', 'Gold'], ['#ff3fb4', 'Pink'], ['#ffffff', 'White']], glowCost: 2500,
   smoke: [['#ff5a5a', 'Red'], ['#5ac8ff', 'Blue'], ['#8dff6a', 'Green'], ['#c98bff', 'Purple'], ['#ffd84a', 'Yellow'], ['#ff8ad8', 'Pink'], ['#2a2a30', 'Black']], smokeCost: 1500,
@@ -30,11 +30,14 @@ function shopOwn() {
     if (old && CFG.body && !s.own.cars.includes(CFG.body)) s.own.cars.push(CFG.body);
     if (old && CFG.color && !s.own.paint.includes(CFG.color.toLowerCase())) s.own.paint.push(CFG.color.toLowerCase());
   }
-  const o = s.own; for (const k of ['cars', 'paint', 'glow', 'smoke']) if (!Array.isArray(o[k])) o[k] = []; if (!o.cars.includes('drift')) o.cars.push('drift'); return o;
+  const o = s.own; for (const k of ['cars', 'paint', 'glow', 'smoke']) if (!Array.isArray(o[k])) o[k] = [];
+  if (o.cars.some(x => CAR_ALIAS[x])) o.cars = [...new Set(o.cars.map(x => CAR_ALIAS[x] || x))]; // removed cars become their replacement
+  if (!o.cars.includes('drift')) o.cars.push('drift'); return o;
 }
 // keeps the selected car/paint/glow/smoke to things this player owns
 function shopFix() {
   if (!ACCT.stats) return; const o = shopOwn(); let ch = false;
+  if (CAR_ALIAS[CFG.body]) { CFG.body = CAR_ALIAS[CFG.body]; ch = true; }
   if (!o.cars.includes(CFG.body)) { CFG.body = 'drift'; ch = true; }
   if (!o.any && !o.paint.includes(String(CFG.color).toLowerCase())) { CFG.color = o.paint[0] || SHOP.paintFree[0]; ch = true; }
   if (CFG.glow && !o.glow.includes(CFG.glow)) { CFG.glow = ''; ch = true; }

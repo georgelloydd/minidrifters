@@ -45,8 +45,9 @@ const ACCT = {
   },
   // push a paint change onto every leaderboard time this player owns, so all tables show the new colour
   syncColor() {
-    const k = 'md_colsync_' + this.key; if (!CLOUD || !this.reg || localStorage.getItem(k) === CFG.color) return;
-    clearTimeout(this._ct); this._ct = setTimeout(() => sb('POST', 'rpc/set_color', { p_key: this.key, p_color: CFG.color }).then(() => localStorage.setItem(k, CFG.color)).catch(() => { }), 1200);
+    const lk = JSON.stringify(carLook(CFG)), k = 'md_looksync_' + this.key; if (!CLOUD || !this.reg || localStorage.getItem(k) === lk) return;
+    clearTimeout(this._ct); this._ct = setTimeout(() => sb('POST', 'rpc/set_look', { p_key: this.key, p_look: JSON.parse(lk) }).then(() => localStorage.setItem(k, lk))
+      .catch(() => sb('POST', 'rpc/set_color', { p_key: this.key, p_color: CFG.color }).catch(() => { })), 1200);
   },
   backup() { return 'MDB1.' + btoa(unescape(encodeURIComponent(JSON.stringify({ k: this.key, d: this.data() })))); },
   async restore(text) {
@@ -122,7 +123,8 @@ async function testOnline() {
 async function submitLap(tr, e) {
   const r = { p_track: +tr, p_pid: e.pid || ACCT.pub, p_name: CFG.name, p_color: CFG.color, p_body: CFG.body, p_lap_ms: Math.round(e.lap), p_score: Math.round(e.score || 0) };
   const perm = er => { const m = /\((\d{3})\)/.exec(er.message), s = m ? +m[1] : 0; if (s >= 400 && s < 500 && s !== 408 && s !== 429) er.perm = true; return er; };
-  if (e.rep) { r.p_replay = e.rep; try { await sb('POST', 'rpc/submit_lap', r); return; } catch (er) { if (!/\(404\)|PGRST202/.test(er.message)) throw perm(er); delete r.p_replay; } }
+  if (e.rep) { r.p_replay = e.rep; r.p_look = carLook(CFG); try { await sb('POST', 'rpc/submit_lap', r); return; } catch (er) { if (!/\(404\)|PGRST202/.test(er.message)) throw perm(er); delete r.p_look; }
+    try { await sb('POST', 'rpc/submit_lap', r); return; } catch (er) { if (!/\(404\)|PGRST202/.test(er.message)) throw perm(er); delete r.p_replay; } }
   try { await sb('POST', 'rpc/submit_lap', r); }
   catch (er) { if (!/\(404\)|PGRST202/.test(er.message)) throw perm(er);
     // old database without submit_lap: plain insert (a duplicate means the server already has a time for us)
@@ -175,16 +177,16 @@ const LB = {
   },
   async wrs() {
     const T = TRACKS.map((t, i) => i).filter(i => !TRACKS[i].test), by = {}; let live = !!CLOUD, err = false, tops;
-    if (CLOUD) { try { tops = await Promise.all(T.map(i => sb('GET', `laps?track=eq.${i}&select=pid,name,color,lap_ms&order=lap_ms.asc&limit=1`).then(r => r && r[0] ? { pid: r[0].pid, name: r[0].name, color: r[0].color } : null))); } catch (e) { live = false; err = true; } }
+    if (CLOUD) { try { tops = await Promise.all(T.map(i => lapsGet(`laps?track=eq.${i}&select=pid,name,color,body,lap_ms&order=lap_ms.asc&limit=1`).then(r => r && r[0] ? { pid: r[0].pid, name: r[0].name, color: r[0].color, body: r[0].body, look: r[0].look || null } : null))); } catch (e) { live = false; err = true; } }
     if (!tops) tops = T.map(i => { const r = this.localGet(i).slice().sort((x, y) => x.lap - y.lap)[0]; return r ? { pid: r.pid, name: r.name, color: r.color } : null; });
-    tops.forEach((r, j) => { if (!r) return; const e = by[r.pid] || (by[r.pid] = { pid: r.pid, name: r.name, color: r.color, n: 0, tracks: [] }); e.n++; e.tracks.push(TRACKS[T[j]].name); });
+    tops.forEach((r, j) => { if (!r) return; const e = by[r.pid] || (by[r.pid] = { pid: r.pid, name: r.name, color: r.color, body: r.body, look: r.look, n: 0, tracks: [] }); e.n++; e.tracks.push(TRACKS[T[j]].name); });
     const rows = Object.values(by).sort((x, y) => y.n - x.n || x.name.localeCompare(y.name)).slice(0, 20); await lbLooks(rows); return { live, err, rows };
   },
   async top(tr) {
     if (!CLOUD) return { live: false, rows: this.localGet(tr).slice(0, 10) };
     try {
-      const r = await sb('GET', `laps?track=eq.${tr}&select=pid,name,color,body,lap_ms,score,created_at&order=lap_ms.asc&limit=100`);
-      const seen = new Set(), rows = []; for (const x of r) { if (seen.has(x.pid)) continue; seen.add(x.pid); rows.push({ pid: x.pid, name: x.name, color: x.color, body: x.body, lap: x.lap_ms, score: x.score, at: Date.parse(x.created_at) }); }
+      const r = await lapsGet(`laps?track=eq.${tr}&select=pid,name,color,body,lap_ms,score,created_at&order=lap_ms.asc&limit=100`);
+      const seen = new Set(), rows = []; for (const x of r) { if (seen.has(x.pid)) continue; seen.add(x.pid); rows.push({ pid: x.pid, name: x.name, color: x.color, body: x.body, look: x.look || null, lap: x.lap_ms, score: x.score, at: Date.parse(x.created_at) }); }
       const mine = Math.round(ACCT.bestLap(tr)), P = this.pend(), srv = rows.find(x => x.pid === ACCT.pub);
       if (ACCT.reg && mine && !TRACKS[tr].test && (!srv || mine < srv.lap) && (r.length < 100 || mine <= r[r.length - 1].lap_ms)) {
         const rj = this.rej()[tr], bad = rj && rj.lap === mine;
@@ -206,12 +208,14 @@ async function loadTweaks() {
 setInterval(loadTweaks, 15000);
 
 // players' current car (paint, body, livery...) from their saved profile, so leaderboards never show an old colour
-const LOOKS = {}; let LOOKS_T = 0;
+const LOOKS = {}; let LOOKS_T = 0, LOOKCOL = true;
+// GET laps with the car spec column, retrying without it on databases that don't have it yet
+async function lapsGet(q) { if (LOOKCOL) { try { return await sb('GET', q.replace('select=pid,', 'select=pid,look,')); } catch (e) { if (!/look|42703|\(400\)/.test(e.message)) throw e; LOOKCOL = false; } } return sb('GET', q); }
 async function lbLooks(rows) {
   if (!CLOUD || !rows) return; if (Date.now() - LOOKS_T > 60000) { for (const k in LOOKS) delete LOOKS[k]; LOOKS_T = Date.now(); }
   const need = [...new Set(rows.map(r => r && r.pid).filter(p => p && p !== ACCT.pub && !(p in LOOKS)))]; if (!need.length) return;
   try {
     const r = await Promise.race([sb('GET', 'profiles?select=pub:data->>pub,cfg:data->cfg&data->>pub=in.(' + need.map(p => encodeURIComponent('"' + p + '"')).join(',') + ')'), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 3500))]);
-    for (const p of need) LOOKS[p] = null; for (const x of r || []) if (x && x.pub && x.cfg) LOOKS[x.pub] = carLook(x.cfg);
+    for (const p of need) if (!(p in LOOKS)) LOOKS[p] = undefined; for (const x of r || []) if (x && x.pub && x.cfg) LOOKS[x.pub] = carLook(x.cfg);
   } catch (e) { }
 }
