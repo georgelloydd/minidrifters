@@ -6,11 +6,11 @@ async function watchRow(tr, row, btn) {
   if (CLOUD) { try { const r = await sb('GET', `laps?track=eq.${tr}&pid=eq.${encodeURIComponent(row.pid)}&select=replay,lap_ms`); if (r && r[0] && r[0].lap_ms === row.lap) rep = r[0].replay; } catch (e) { } }
   if (!decRep(rep) && row.pid === ACCT.pub) rep = localStorage.getItem('md_rep_' + tr);
   if (btn) btn.textContent = 'Watch';
-  if (!decRep(rep)) return alert('There is no replay for this lap yet. Replays are saved with new personal bests.');
+  if (!decRep(rep)) return uiAlert('There is no replay for this lap yet. Replays are saved with new personal bests.');
   openReplay(tr, rep, lookOf(row), row.name, row.lap);
 }
 function openReplay(track, rep, look, name, lapMs) {
-  const L = decRep(rep); if (!L || L.length < 5) return alert('No replay for this lap.');
+  const L = decRep(rep); if (!L || L.length < 5) return uiAlert('No replay for this lap.');
   G.cfg = { track, laps: 0, mode: 'tt' }; G.tr = buildTrack(track); G.smoke = []; G.snow = []; G.mp = false; G.tt = null; G.rem.clear(); G.ghost = null; G.ghostCar = null; G.wx = 'auto';
   const c = newCar(0, G.tr, 'rp', '', look.color || CFG.color); Object.assign(c, carLook(look)); c.name = '';
   Object.assign(RP, { on: true, L, t: 0, spd: 1, play: true, cam: 'auto', name: name || 'Driver', lap: lapMs || (L.length - 1) * 100, len: (L.length - 1) / 10, tvI: 0, autoT: 0, autoI: 0, rec: null, car: c, lastMode: null });
@@ -71,8 +71,8 @@ function rpUI() {
 }
 function rpRecord() {
   if (RP.rec) { try { RP.rec.stop(); } catch (e) { } return; }
-  if (!cv.captureStream || typeof MediaRecorder === 'undefined') return alert('Your browser cannot record video. Try Chrome, Edge or Firefox.');
-  const mt = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'].find(m => MediaRecorder.isTypeSupported(m)); if (!mt) return alert('Your browser cannot record video.');
+  if (!cv.captureStream || typeof MediaRecorder === 'undefined') return uiAlert('Your browser cannot record video. Try Chrome, Edge or Firefox.');
+  const mt = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4'].find(m => MediaRecorder.isTypeSupported(m)); if (!mt) return uiAlert('Your browser cannot record video.');
   const chunks = [], r = new MediaRecorder(cv.captureStream(60), { mimeType: mt, videoBitsPerSecond: 8e6 });
   r.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
   r.onstop = () => { RP.rec = null; rpUI(); if (!chunks.length) return; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(chunks, { type: mt })); a.download = 'mini-drifters-' + String(G.tr.name || 'track').replace(/\W+/g, '-').toLowerCase() + '-replay.' + (mt.includes('mp4') ? 'mp4' : 'webm'); document.body.appendChild(a); a.click(); a.remove(); };

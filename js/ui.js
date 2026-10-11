@@ -13,12 +13,12 @@ function refreshMenu() {
   document.querySelectorAll('.tk').forEach(s => s.classList.toggle('on', +s.dataset.t === CFG.track));
   document.querySelectorAll('[data-mode]').forEach(s => s.classList.toggle('on', s.dataset.mode === CFG.mode));
   document.querySelectorAll('[data-l]').forEach(s => s.classList.toggle('on', +s.dataset.l === CFG.laps));
-  document.querySelectorAll('.ty').forEach(s => { s.classList.toggle('on', s.dataset.b === CFG.body); drawCarPreview(s.querySelector('canvas'), Object.assign(carLook(CFG), { body: s.dataset.b }), -0.35); });
+  document.querySelectorAll('.ty').forEach(s => { s.classList.toggle('on', s.dataset.b === CFG.body); drawCarPreview(s.querySelector('canvas'), showLook(s.dataset.b), -0.4, { pixel: 2, zoom: 1.12 }); });
   netSwUI();
   $('pubChk').disabled = !listOn(); $('pubRow').classList.toggle('dim', !listOn()); $('pubRow').title = listOn() ? '' : 'Needs Supabase set up (js/config.js)';
   const r = rec(CFG.track); $('records').textContent = `Your records on ${TRACKS[CFG.track].name}: best lap ${fmt(ACCT.bestLap(CFG.track) || r.lap)} • best drift score ${(r.score || 0).toLocaleString()}`;
   const t = carType(CFG.body); $('gDesc').textContent = t.name.toUpperCase() + ' · ' + t.desc;
-  drawCarPreview($('gPrev'), carLook(CFG), -0.5); if (typeof shopDecorate === 'function') shopDecorate();
+  drawCarPreview($('gPrev'), carLook(CFG), -0.45, { pixel: 3, zoom: 1.05 }); if (typeof shopDecorate === 'function') shopDecorate();
   $('chip').querySelector('i').style.background = CFG.color; $('chip').querySelector('b').textContent = CFG.name; $('chip').querySelector('small').textContent = (ACCT.reg ? '' : 'Guest · ') + '🪙 ' + (ACCT.stats.coins || 0).toLocaleString() + ' coins';
   refreshAcct();
 }
@@ -83,7 +83,7 @@ function buildMenu() {
   }
   FINISHES.forEach(([id, n]) => { const b = document.createElement('button'); b.className = 'opt'; b.dataset.fin = id; b.textContent = n; b.onclick = () => { CFG.finish = id; saveCfg(); refreshMenu(); }; $('finishes').appendChild(b); });
   $('numIn').oninput = () => { CFG.num = $('numIn').value.replace(/\D/g, '').slice(0, 2); saveCfg(); refreshMenu(); };
-  CAR_TYPES.forEach(t => { const d = document.createElement('div'); d.className = 'ty'; d.dataset.b = t.id; const c = document.createElement('canvas'); c.width = 120; c.height = 70; d.appendChild(c); d.appendChild(document.createTextNode(t.name)); d.onclick = () => { CFG.body = t.id; saveCfg(); refreshMenu(); }; $('types').appendChild(d); });
+  CAR_TYPES.forEach(t => { const d = document.createElement('div'); d.className = 'ty'; d.dataset.b = t.id; d.innerHTML = `<div class="tyTop"><i class="tyLock"></i><span class="tyPrice"></span></div><canvas width="160" height="92"></canvas><div class="tyName">${esc(t.name)}</div><div class="tyTier"></div>`; d.onclick = () => { CFG.body = t.id; saveCfg(); refreshMenu(); }; $('types').appendChild(d); });
   LIVERIES.forEach(l => { const d = document.createElement('div'); d.className = 'lvt'; d.dataset.lv = l.id; const c = document.createElement('canvas'); c.width = 110; c.height = 64; d.appendChild(c); d.appendChild(document.createTextNode(l.name)); d.onclick = () => { CFG.livery = l.id; saveCfg(); refreshMenu(); }; $('livs').appendChild(d); });
   TRACKS.forEach((t, i) => { if (t.test || t.hidden) return; const d = document.createElement('div'); d.className = 'tk'; d.dataset.t = i; const c = document.createElement('canvas'); c.width = 200; c.height = 120; const g = c.getContext('2d'), tr = buildTrack(i, true); let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const p of tr.pts) { const px = p[0] !== undefined ? p[0] : p.x, py = p[1] !== undefined ? p[1] : p.y; if (px < x0) x0 = px; if (px > x1) x1 = px; if (py < y0) y0 = py; if (py > y1) y1 = py; } const pad = tr.w / 2 + 40; x0 -= pad; y0 -= pad; x1 += pad; y1 += pad; const s = Math.min(184 / Math.max(1, x1 - x0), 104 / Math.max(1, y1 - y0));
     g.fillStyle = '#0e0e10'; g.fillRect(0, 0, 200, 120); g.translate(100 - s * (x0 + x1) / 2, 60 - s * (y0 + y1) / 2); g.scale(s, s); g.lineJoin = 'round'; pathTrack(g, tr); g.strokeStyle = '#ff2a2a'; g.lineWidth = Math.max(tr.w + 80, 8 / s); g.shadowColor = '#ff2a2a'; g.shadowBlur = 14; g.stroke(); g.shadowBlur = 0; g.strokeStyle = '#1c1c20'; g.lineWidth = Math.max(tr.w + 10, 3 / s); g.stroke();
@@ -108,14 +108,14 @@ function buildMenu() {
   $('pubChk').checked = NET.public; $('pubChk').onchange = () => { NET.public = $('pubChk').checked; rtListServer(); };
   serversWatch(renderServers);
   $('bReveal').onclick = () => { KEYSHOWN = !KEYSHOWN; refreshAcct(); };
-  const copy = (t, ok) => { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => msg('acctMsg', ok), () => { prompt('Copy this:', t); }); };
+  const copy = (t, ok) => { (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => msg('acctMsg', ok), () => { uiCopy(t); }); };
   $('bReg').onclick = async () => { msg('regMsg', 'Checking name…'); $('bReg').disabled = true; try { const m = await ACCT.signUp($('regName').value); $('regName').value = ''; msg('regMsg'); KEYSHOWN = true; saveCfg(); refreshMenu(); msg('acctMsg', m); } catch (e) { msg('regMsg', e.message); } finally { $('bReg').disabled = false; } };
   $('regName').onkeydown = e => { if (e.key === 'Enter') $('bReg').click(); e.stopPropagation(); };
   $('bCopyKey').onclick = () => copy(ACCT.key, 'Key copied. Keep it somewhere safe.');
   $('bBackup').onclick = () => copy(ACCT.backup(), 'Backup code copied. Paste it into Sign in on another device.');
   $('bSignIn').onclick = async () => { try { const m = await ACCT.restore($('keyIn').value); $('keyIn').value = ''; saveCfg(); refreshMenu(); msg(ACCT.reg ? 'acctMsg' : 'signMsg', m); if (ACCT.reg) msg('signMsg'); } catch (e) { msg('signMsg', e.message); } };
   $('keyIn').onkeydown = e => { if (e.key === 'Enter') $('bSignIn').click(); e.stopPropagation(); };
-  $('bLogout').onclick = async () => { if (!confirm('Log out? Make sure you have copied your key, you need it to sign back in.')) return; if (typeof NET !== 'undefined' && NET.on && typeof netLeave === 'function') netLeave(); await ACCT.logout(); KEYSHOWN = false; saveCfg(); refreshMenu(); msg('acctMsg'); msg('nameMsg'); msg('signMsg', 'Logged out. You are now playing as Driver.'); };
+  $('bLogout').onclick = async () => { if (!await uiConfirm('Make sure you have copied your key, you need it to sign back in.', { title: 'Log out?', yes: 'Log out', danger: true })) return; if (typeof NET !== 'undefined' && NET.on && typeof netLeave === 'function') netLeave(); await ACCT.logout(); KEYSHOWN = false; saveCfg(); refreshMenu(); msg('acctMsg'); msg('nameMsg'); msg('signMsg', 'Logged out. You are now playing as Driver.'); };
   $('bSolo').onclick = () => { msg('joinMsg'); G.plist = []; startSession({ track: CFG.track, laps: 0, mode: 'tt' }, null, false); };
   $('bHost').onclick = () => {
     if (!ACCT.reg) { setTab('acct'); return msg('regMsg', 'Create an account first to host or join races.'); }
@@ -175,7 +175,7 @@ netOn('gone', d => { if (NET.host || !d || d.id === NET.myId) return; G.plist = 
 netOn('left', id => { const r = G.rem.get(id); if (r && G.state !== 'lobby') { pop(r.car.name + ' left', '#aaa'); G.rem.delete(id); if (G.firstFin) hostRes(false); } });
 netOn('joined', () => { });
 function handleEsc() {
-  if (G.tt && G.state === 'race') endTT(); else if (G.state === 'over') toMenu(); else if (G.state === 'race' || G.state === 'countdown') { if (!G.mp) toMenu(); else if (NET.host) { if (confirm('End the race for everyone and go back to the lobby?')) hostToLobby(); } else if (confirm('Leave the room?')) toMenu(); }
+  if (G.tt && G.state === 'race') endTT(); else if (G.state === 'over') toMenu(); else if (G.state === 'race' || G.state === 'countdown') { if (!G.mp) toMenu(); else if (NET.host) { uiConfirm('Everyone goes back to the lobby.', { title: 'End the race?', yes: 'End race', danger: true }).then(y => { if (y) hostToLobby(); }); } else uiConfirm('You will leave this race and the room.', { title: 'Leave the room?', yes: 'Leave', danger: true }).then(y => { if (y) toMenu(); }); }
   else if (G.state === 'lobby') toMenu();
 }
 addEventListener('keydown', e => {
@@ -238,7 +238,7 @@ async function raceGhost(tr, row, btn) {
   if (CLOUD) { try { const r = await sb('GET', `laps?track=eq.${tr}&pid=eq.${encodeURIComponent(row.pid)}&select=replay,lap_ms`); if (r && r[0] && r[0].lap_ms === row.lap) rep = r[0].replay; } catch (e) { } }
   if (!decRep(rep) && row.pid === ACCT.pub) rep = localStorage.getItem('md_rep_' + tr);
   if (btn) btn.textContent = 'Race against ghost';
-  if (!decRep(rep)) return alert('There is no ghost for this lap yet. Ghosts are saved with new personal bests from now on.');
+  if (!decRep(rep)) return uiAlert('There is no ghost for this lap yet. Ghosts are saved with new personal bests from now on.');
   G.ghostPick = Object.assign(lookOf(row), { rep, name: row.name, color: liveCol(row), wr: row === LBROWS[0], own: row.pid === ACCT.pub }); CFG.track = tr; G.plist = []; startSession({ track: tr, laps: 0, mode: 'tt' }, null, false);
 }
 

@@ -82,7 +82,7 @@ function drawCar(g, c, night) {
   if (night) { g.save(); g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(h, 0, 4, h + 170, 0, 230); gr.addColorStop(0, 'rgba(255,240,200,.2)'); gr.addColorStop(1, 'rgba(255,240,200,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(h * 0.9, -w * 0.7); g.lineTo(h + 250, -110); g.lineTo(h + 250, 110); g.lineTo(h * 0.9, w * 0.7); g.fill(); g.restore(); }
   if (c.glow) { g.save(); g.globalCompositeOperation = 'lighter'; const gg = g.createRadialGradient(0, 0, 3, 0, 0, L * 0.8); gg.addColorStop(0, rgba(c.glow, 0.6)); gg.addColorStop(0.6, rgba(c.glow, 0.22)); gg.addColorStop(1, rgba(c.glow, 0)); g.fillStyle = gg; g.beginPath(); g.ellipse(0, 0, L * 0.8, W * 1.05, 0, 0, 7); g.fill(); g.restore(); }
   // shadow
-  g.fillStyle = 'rgba(0,0,0,.38)'; g.save(); g.translate(5, 7); bodyPath(g, id, L, W); g.fill(); g.restore();
+  if (!c.noShadow) { g.fillStyle = 'rgba(0,0,0,.38)'; g.save(); g.translate(5, 7); bodyPath(g, id, L, W); g.fill(); g.restore(); }
   // wheels
   g.fillStyle = '#121214'; const S0 = t.s || {}, ow = S0.ow !== undefined ? S0.ow : id === 'f1' ? 8 : id === 'drift' ? 2 : 0, tw = S0.tw || (id === 'f1' ? 16 : 14), th = S0.th || (id === 'f1' ? 11 : 10);
   const rim = c.rim || '#c9ccd2';
@@ -97,6 +97,12 @@ function drawCar(g, c, night) {
   if (id === 'kei') { g.fillStyle = shadeHex(col, 0.75); g.fillRect(-h, -w, L * 0.6, W); if (lv !== 'clean') { g.save(); g.beginPath(); g.rect(-h, -w, L * 0.6, W); g.clip(); drawLivery(g, lv, col, L, W, id, c.accent, c.accent2); g.fillStyle = 'rgba(0,0,0,.28)'; g.fillRect(-h, -w, L * 0.6, W); g.restore(); } g.strokeStyle = 'rgba(0,0,0,.45)'; g.lineWidth = 1.5; g.strokeRect(-h + 3, -w + 3, L * 0.6 - 6, W - 6); g.beginPath(); g.moveTo(-h + 3 + L * 0.2, -w + 3); g.lineTo(-h + 3 + L * 0.2, w - 3); g.moveTo(-h + 3 + L * 0.4, -w + 3); g.lineTo(-h + 3 + L * 0.4, w - 3); g.stroke(); }
   g.restore();
   bodyPath(g, id, L, W); g.strokeStyle = 'rgba(0,0,0,.5)'; g.lineWidth = 1.5; g.stroke();
+  // chunky highlight along the top edge + shade along the bottom edge (pixel-art style panels)
+  if (id !== 'f1') { g.save(); bodyPath(g, id, L, W); g.clip(); g.lineWidth = 2.2;
+    g.strokeStyle = rgba(shadeHex(col, 1.6), 0.55); g.save(); g.translate(1.4, 1.4); bodyPath(g, id, L, W); g.stroke(); g.restore();
+    g.strokeStyle = 'rgba(0,0,0,.32)'; g.save(); g.translate(-1.4, -1.4); bodyPath(g, id, L, W); g.stroke(); g.restore(); g.restore(); }
+  // side mirrors
+  if (id !== 'f1' && !(t.s && t.s.shape === 'kart')) { g.fillStyle = shadeHex(col, 0.7); for (const sx of [-1, 1]) { g.fillRect(L * 0.1, sx * (w + 1.2) - 1.3, 3.2, 2.6); } g.fillStyle = 'rgba(0,0,0,.45)'; for (const sx of [-1, 1]) g.fillRect(L * 0.1, sx * (w + 1.2) + (sx > 0 ? 0.6 : -1.3), 3.2, 0.7); }
   // cabin / glass
   const glass = (x0, x1, y0, y1) => { const wg = g.createLinearGradient(x0, 0, x1, 0); wg.addColorStop(0, '#0d1420'); wg.addColorStop(1, '#4a6a8a'); g.fillStyle = wg; g.beginPath(); g.moveTo(x0, -y0); g.lineTo(x1, -y1); g.lineTo(x1, y1); g.lineTo(x0, y0); g.closePath(); g.fill(); };
   const elv = id === 'muscle' && lv === 'clean' ? 'racing' : lv, roof = (x, y, rw, rh) => { g.fillStyle = shadeHex(col, 1.3); g.beginPath(); g.roundRect(x, y, rw, rh, 4); g.fill();
@@ -119,12 +125,34 @@ function drawCar(g, c, night) {
   g.restore();
 }
 // Garage preview canvas: drawCarPreview(canvas, look, angle) (old form (canvas, body, color, livery, angle) still works)
+// opts (object form only): { pixel: n } renders at 1/n resolution and scales up with hard pixels + a dark outline; { zoom }
+const PIXBUF = [document.createElement('canvas'), document.createElement('canvas')];
 function drawCarPreview(cv, a, b, c2, d) {
-  const look = a && typeof a === 'object' ? a : { body: a, color: b, livery: c2 }, ang = a && typeof a === 'object' ? b : d;
+  const obj = a && typeof a === 'object', look = obj ? a : { body: a, color: b, livery: c2 }, ang = obj ? b : d, opt = obj && c2 && typeof c2 === 'object' ? c2 : {};
   const g = cv.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
-  const s = Math.min(cv.width / 84, cv.height / 54); g.translate(cv.width / 2, cv.height / 2); g.scale(s, s);
-  drawCar(g, Object.assign({ x: 0, y: 0, a: ang === undefined ? -0.5 : ang, steer: 0.4 }, look), false); g.setTransform(1, 0, 0, 1, 0, 0);
+  const car = Object.assign({ x: 0, y: 0, a: ang === undefined ? -0.5 : ang, steer: 0.4 }, look), zm = opt.zoom || 1, px = opt.pixel || 0;
+  if (!px) { const s = Math.min(cv.width / 84, cv.height / 54) * zm; g.translate(cv.width / 2, cv.height / 2); g.scale(s, s); drawCar(g, car, false); g.setTransform(1, 0, 0, 1, 0, 0); return; }
+  const bw = Math.ceil(cv.width / px), bh = Math.ceil(cv.height / px), [P, O] = PIXBUF; P.width = O.width = bw; P.height = O.height = bh;
+  const pg = P.getContext('2d'), og = O.getContext('2d'), s = Math.min(bw / 84, bh / 54) * zm;
+  pg.imageSmoothingEnabled = false; pg.translate(bw / 2, bh / 2); pg.scale(s, s); drawCar(pg, Object.assign({}, car, { glow: '', noShadow: true }), false);
+  og.drawImage(P, 0, 0); og.globalCompositeOperation = 'source-in'; og.fillStyle = '#05060d'; og.fillRect(0, 0, bw, bh); og.globalCompositeOperation = 'source-over';
+  const W2 = bw * px, H2 = bh * px, ox = (cv.width - W2) / 2, oy = (cv.height - H2) / 2; g.imageSmoothingEnabled = false;
+  if (car.glow) { g.save(); g.globalCompositeOperation = 'lighter'; const gg = g.createRadialGradient(cv.width / 2, cv.height / 2, 2, cv.width / 2, cv.height / 2, cv.width * 0.42); gg.addColorStop(0, rgba(car.glow, 0.55)); gg.addColorStop(1, rgba(car.glow, 0)); g.fillStyle = gg; g.fillRect(0, 0, cv.width, cv.height); g.restore(); }
+  g.globalAlpha = 0.4; g.drawImage(O, ox + 2 * px, oy + 3 * px, W2, H2); g.globalAlpha = 1; // drop shadow
+  for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) g.drawImage(O, ox + dx * px, oy + dy * px, W2, H2); // outline
+  g.drawImage(P, ox, oy, W2, H2); g.imageSmoothingEnabled = true;
 }
+// showroom colours for each car (used on the garage cards, like a real dealership)
+const CAR_SHOW = {
+  drift: { color: '#eceef2', livery: 'split', accent: '#18181b', accent2: '#18181b' }, micro: { color: '#8a8f9c', livery: 'stripe', accent: '#ffd60a', accent2: '#ffd60a' },
+  kart: { color: '#ffd60a', livery: 'clean' }, street: { color: '#3b3f48', livery: 'clean' }, minnow: { color: '#1f8a52', livery: 'clean', accent: '#f4f4f4' },
+  bug: { color: '#d4202c', livery: 'racing', accent: '#f4f4f4', accent2: '#f4f4f4' }, kei: { color: '#1e6fe0', livery: 'clean' }, hachi: { color: '#f4f4f4', livery: 'split', accent: '#18181b', accent2: '#18181b' },
+  camper: { color: '#ff6a1a', livery: 'clean', accent: '#f4efe4' }, pickup: { color: '#2e5a43', livery: 'clean' }, muscle: { color: '#f2f0ea', livery: 'racing', accent: '#18181b', accent2: '#18181b' },
+  pony: { color: '#7a3fd0', livery: 'racing', accent: '#f4f4f4', accent2: '#f4f4f4' }, msedan: { color: '#1d4fd8', livery: 'clean' }, rotary: { color: '#e01b24', livery: 'clean' },
+  flat6: { color: '#2b2d33', livery: 'clean' }, rspec: { color: '#3a3d46', livery: 'racing', accent: '#2f6bff', accent2: '#2f6bff' }, hellkat: { color: '#4a2d7a', livery: 'clean' },
+  f1: { color: '#d4202c', livery: 'clean' }, wedge: { color: '#f2f2f2', livery: 'clean' },
+};
+function showLook(id) { return carLook(Object.assign({ finish: 'gloss', livery: 'clean', num: '', rim: '#c9ccd2' }, CAR_SHOW[id] || {}, { body: id })); }
 
 // ---------- shared drawing for the newer cars (shape / cabin / extras / lights come from the car's spec) ----------
 function drawHelmet(g, x, y, r, col) {

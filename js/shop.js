@@ -65,10 +65,22 @@ function achCheck(o) {
   const use = ACCT.use.bind(ACCT);
   ACCT.use = async function (k, f) { const r = await use(k, f); shopOwn(); shopFix(); if (achCheck()) this.save(); return r; };
 })();
-function shopBuy(kind, id, price, name, apply) {
-  const o = shopOwn();
+function carTier(p) { return p <= 0 ? ['starter', 'Starter'] : p <= 1500 ? ['common', 'Common'] : p <= 3500 ? ['rare', 'Rare'] : p <= 6500 ? ['epic', 'Epic'] : ['legendary', 'Legendary']; }
+let BUYING = false;
+// ex: { look } for cars (shows the car), { sw: colour } for paint / glow / smoke
+async function shopBuy(kind, id, price, name, apply, ex) {
+  const o = shopOwn(); ex = ex || {}; if (BUYING) return;
   if (coins() < price) return pop('NOT ENOUGH COINS · ' + (price - coins()).toLocaleString() + ' MORE NEEDED', '#ff3b3b');
-  if (!confirm(`Buy ${name} for ${price.toLocaleString()} coins?\nYou have ${coins().toLocaleString()}.`)) return;
+  const tr = ex.look ? carTier(price) : null;
+  const html = (ex.look ? '<canvas class="buyPrev" width="384" height="216"></canvas>' : ex.sw ? `<div class="buySw" style="background:${ex.sw}"></div>` : '')
+    + (tr ? `<div class="buyTag"><b>${esc(name.replace(/^the /, ''))}</b><span class="tier t-${tr[0]}">${tr[1]}</span></div>` : '')
+    + `<div class="buyRow"><span>Price</span><b><i class="coin"></i>${price.toLocaleString()}</b></div><div class="buyRow"><span>You have</span><b><i class="coin"></i>${coins().toLocaleString()}</b></div><div class="buyRow"><span>After</span><b><i class="coin"></i>${(coins() - price).toLocaleString()}</b></div>`;
+  BUYING = true;
+  const ok = await uiConfirm('', { title: 'Buy ' + name + '?', cls: 'buyDlg', html, yes: 'Buy', no: 'Not now', gold: true,
+    onOpen: box => { const cv = box.querySelector('.buyPrev'); if (cv) drawCarPreview(cv, ex.look, -0.4, { pixel: 3, zoom: 1.15 }); } });
+  BUYING = false; if (!ok) return;
+  if (kind !== 'any' && o[kind].includes(id)) return;
+  if (coins() < price) return pop('NOT ENOUGH COINS · ' + (price - coins()).toLocaleString() + ' MORE NEEDED', '#ff3b3b');
   ACCT.stats.coins = coins() - price; o.bought = (o.bought || 0) + 1;
   if (kind === 'any') o.any = true; else o[kind].push(id);
   if (typeof sndUi === 'function') sndUi('go');
@@ -79,19 +91,21 @@ const pr = n => '🪙 ' + n.toLocaleString();
 function shopDecorate() {
   if (!$('tab-garage')) return; shopFix(); const o = shopOwn();
   let cb = $('coinBar'); if (!cb) { cb = document.createElement('div'); cb.id = 'coinBar'; cb.className = 'coinBar'; $('tab-garage').insertBefore(cb, $('tab-garage').querySelector('.garage')); }
-  cb.innerHTML = `<b>🪙 ${coins().toLocaleString()}</b> coins <small class="dim">· earn them from laps, drifting, distance and wins</small>`;
-  document.querySelectorAll('.ty').forEach(d => { const p = SHOP.cars[d.dataset.b] || 0, lk = !o.cars.includes(d.dataset.b); d.classList.toggle('locked', lk); d.dataset.price = lk ? pr(p) : ''; });
+  cb.innerHTML = `<i class="coin big"></i><b>${coins().toLocaleString()}</b><span>coins</span><small>Earn them from laps, drifting, distance and wins · ${o.cars.length}/${CAR_TYPES.length} cars owned</small>`;
+  document.querySelectorAll('.ty').forEach(d => { const p = SHOP.cars[d.dataset.b] || 0, lk = !o.cars.includes(d.dataset.b), tr = carTier(p); d.classList.toggle('locked', lk); d.dataset.price = ''; d.dataset.tier = tr[0];
+    const pe = d.querySelector('.tyPrice'); if (pe) pe.innerHTML = lk ? '<i class="coin"></i>' + p.toLocaleString() : d.dataset.b === CFG.body ? 'Equipped' : 'Owned'; const te = d.querySelector('.tyTier'); if (te) te.textContent = tr[1]; });
+  const ct = carType(CFG.body), ctr = carTier(SHOP.cars[ct.id] || 0); if ($('gDesc')) $('gDesc').innerHTML = `<b class="gName">${esc(ct.name)}</b><span class="tier t-${ctr[0]}">${ctr[1]}</span><br><span class="gTxt">${esc(ct.desc || '')}</span>`;
   const row = document.querySelector('.prow[data-f="color"]');
   if (row) {
     row.querySelectorAll('.sw').forEach(s => { const lk = !o.any && !o.paint.includes(s.dataset.c.toLowerCase()); s.classList.toggle('locked', lk); s.title = lk ? 'Unlock for ' + SHOP.paintCost + ' coins' : s.dataset.c.toUpperCase(); });
     row.querySelectorAll('input').forEach(i => { i.disabled = !o.any; i.title = o.any ? '' : 'Unlock any colour in the shop'; });
-    let ab = row.querySelector('.anyBuy'); if (!o.any && !ab) { ab = document.createElement('button'); ab.className = 'opt anyBuy'; ab.textContent = '🔒 Any colour · ' + pr(SHOP.anyPaint); ab.onclick = () => shopBuy('any', 'any', SHOP.anyPaint, 'any colour paint'); row.appendChild(ab); } if (o.any && ab) ab.remove();
+    let ab = row.querySelector('.anyBuy'); if (!o.any && !ab) { ab = document.createElement('button'); ab.className = 'opt anyBuy'; ab.textContent = '🔒 Any colour · ' + pr(SHOP.anyPaint); ab.onclick = () => shopBuy('any', 'any', SHOP.anyPaint, 'any colour paint', null, { sw: 'linear-gradient(90deg,#ff3b3b,#ffd60a,#7bff4a,#1ec8ff,#c04bff,#ff3fb4)' }); row.appendChild(ab); } if (o.any && ab) ab.remove();
   }
   for (const [kind, label, list, cost] of [['glow', 'Underglow', SHOP.glow, SHOP.glowCost], ['smoke', 'Tyre smoke', SHOP.smoke, SHOP.smokeCost]]) {
     let r = $('row_' + kind);
     if (!r) { const lb = document.createElement('label'); lb.textContent = label; r = document.createElement('div'); r.id = 'row_' + kind; r.className = 'row xrow'; const g = document.querySelector('.gopts'); g.appendChild(lb); g.appendChild(r);
       r.innerHTML = `<button class="opt" data-x="">None</button>` + list.map(([c, n]) => `<button class="opt xsw" data-x="${c}" data-n="${n}"><i style="background:${c}"></i>${n}<small></small></button>`).join('');
-      r.querySelectorAll('button').forEach(b => b.onclick = () => { const c = b.dataset.x; if (!c || shopOwn()[kind].includes(c)) { CFG[kind] = c; saveCfg(); refreshMenu(); } else shopBuy(kind, c, cost, b.dataset.n + ' ' + label.toLowerCase(), () => { CFG[kind] = c; }); }); }
+      r.querySelectorAll('button').forEach(b => b.onclick = () => { const c = b.dataset.x; if (!c || shopOwn()[kind].includes(c)) { CFG[kind] = c; saveCfg(); refreshMenu(); } else shopBuy(kind, c, cost, b.dataset.n + ' ' + label.toLowerCase(), () => { CFG[kind] = c; }, { sw: c }); }); }
     r.querySelectorAll('button').forEach(b => { const c = b.dataset.x, lk = c && !o[kind].includes(c); b.classList.toggle('on', (CFG[kind] || '') === c); b.classList.toggle('locked', !!lk); const sm = b.querySelector('small'); if (sm) sm.textContent = lk ? ' · ' + pr(cost) : ''; });
   }
   let ac = $('achBox'); if (!ac && $('tab-acct')) { ac = document.createElement('div'); ac.id = 'achBox'; ac.className = 'card'; $('tab-acct').appendChild(ac); }
@@ -101,6 +115,6 @@ function shopDecorate() {
 // locked paint swatches / cars open the buy prompt instead of selecting
 document.addEventListener('click', e => {
   const sw = e.target.closest('.prow[data-f="color"] .sw.locked'), ty = e.target.closest('.ty.locked');
-  if (sw) { e.stopPropagation(); e.preventDefault(); const c = sw.dataset.c.toLowerCase(); shopBuy('paint', c, SHOP.paintCost, c.toUpperCase() + ' paint', () => { CFG.color = c; }); }
-  else if (ty) { e.stopPropagation(); e.preventDefault(); const t = carType(ty.dataset.b); shopBuy('cars', t.id, SHOP.cars[t.id] || 0, 'the ' + t.name, () => { CFG.body = t.id; }); }
+  if (sw) { e.stopPropagation(); e.preventDefault(); const c = sw.dataset.c.toLowerCase(); shopBuy('paint', c, SHOP.paintCost, c.toUpperCase() + ' paint', () => { CFG.color = c; }, { sw: c }); }
+  else if (ty) { e.stopPropagation(); e.preventDefault(); const t = carType(ty.dataset.b); shopBuy('cars', t.id, SHOP.cars[t.id] || 0, 'the ' + t.name, () => { CFG.body = t.id; }, { look: showLook(t.id) }); }
 }, true);
