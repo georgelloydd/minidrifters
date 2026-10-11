@@ -76,10 +76,21 @@ function drawMini() {
   for (const c of [...[...G.rem.values()].map(r => r.car), G.me]) { m.fillStyle = c.color; m.strokeStyle = c === G.me ? '#fff' : '#000'; m.lineWidth = 2; m.beginPath(); m.arc(10 + c.x * MINI.s, 10 + c.y * MINI.s, c === G.me ? 6 : 5, 0, 7); m.fill(); m.stroke(); }
 }
 function renderAttract(dt) {
-  if (!G.attract || G.attract.idx !== CFG.track) { G.attract = { idx: CFG.track, tr: buildTrack(CFG.track), i: 0 }; }
-  const A = G.attract, tr = A.tr; A.i = (A.i + dt * 38) % tr.n; const i = Math.floor(A.i), p = tr.pts[i], d = tr.dirs[i], d2 = tr.dirs[(i + 25) % tr.n], turn = angDiff(d2, d);
-  const car = { x: p[0], y: p[1], a: d + Math.max(-0.7, Math.min(0.7, turn * 2.2)), steer: -Math.sign(turn) * 0.8, brake: false, ...carLook(CFG) };
-  const cam = { x: p[0], y: p[1], z: Math.min(VW, VH) / 1100, a: 0 };
+  if (!G.attract || G.attract.idx !== CFG.track) {
+    const idx = CFG.track; G.attract = { idx, tr: buildTrack(idx), i: 0, t: 0, L: decRep(localStorage.getItem('md_rep_' + idx)), gc: {} };
+    if (typeof pbRepCloud === 'function') pbRepCloud(idx).then(r => { const A = G.attract; if (r && A && A.idx === idx) { A.L = decRep(r); A.t = 0; A.gc = {}; } }).catch(() => { });
+  }
+  const A = G.attract, tr = A.tr; let car;
+  if (A.L) { // your PB lap, replayed on a loop (same ghost you race in time trial)
+    const g = A.gc, pa = g.a; A.t = (A.t + dt * 10) % (A.L.length - 1); ghostPose(A.L, A.t, g);
+    const yaw = pa == null ? 0 : angDiff(g.a, pa) / Math.max(dt, 1e-3), slip = g.speed > 60 ? angDiff(Math.atan2(g.vy, g.vx), g.a) : 0;
+    A.st = (A.st || 0) + (Math.max(-1, Math.min(1, -yaw * 0.45)) - (A.st || 0)) * Math.min(1, dt * 8);
+    car = Object.assign({ steer: A.st, brake: false, drift: Math.abs(slip) > 0.25 }, carLook(CFG), { x: g.x, y: g.y, a: g.a, vx: g.vx, vy: g.vy, speed: g.speed });
+  } else {
+    A.i = (A.i + dt * 38) % tr.n; const i = Math.floor(A.i), p = tr.pts[i], d = tr.dirs[i], d2 = tr.dirs[(i + 25) % tr.n], turn = angDiff(d2, d);
+    car = { x: p[0], y: p[1], a: d + Math.max(-0.7, Math.min(0.7, turn * 2.2)), steer: -Math.sign(turn) * 0.8, brake: false, ...carLook(CFG) };
+  }
+  const cam = { x: car.x, y: car.y, z: Math.min(VW, VH) / 1100, a: 0 };
   drawWorld(tr, cam, [car], false);
 }
 function toMenu() {

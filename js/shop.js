@@ -12,7 +12,7 @@ const CATS = [
   { k: 'paint', all: 'any', f: ['color'], name: 'Primary', sub: 'Main body colour', cost: 400, allCost: 4000, def: '#ff2a6d' },
   { k: 'sec', all: 'secAll', f: ['accent2', 'accent'], name: 'Secondary', sub: 'Secondary + stripe colours, used by your secondary pattern', cost: 200, allCost: 2000, def: '#ffd60a' },
   { k: 'rim', all: 'rimAll', f: ['rim'], name: 'Wheels', sub: 'Rim colour', cost: 200, allCost: 2000, def: '#d4a838' },
-  { k: 'glow', all: 'glowAll', f: ['glow'], name: 'Underglow', sub: 'Neon light under the car', cost: 1500, allCost: 20000, def: '#1ec8ff', opt: true },
+  { k: 'glow', all: 'glowAll', f: ['glow'], name: 'Underglow', sub: 'Neon light under the car', cost: 2500, allCost: 25000, def: '#1ec8ff', opt: true },
   { k: 'smoke', all: 'smokeAll', f: ['smoke'], name: 'Tyre smoke', sub: 'Colour of your drift smoke', cost: 1000, allCost: 10000, def: '#c98bff', opt: true },
 ];
 const CAT_OF = { color: 'paint', accent: 'sec', accent2: 'sec', rim: 'rim', glow: 'glow', smoke: 'smoke' };
@@ -53,7 +53,7 @@ function shopOwn() {
   for (const c of CATS) o[c.all] = !!o[c.all];
   for (const [x, p] of [['micro', 800], ['wedge', 15000]]) if (o.cars.includes(x)) { // retired cars: money back
     o.cars = o.cars.filter(c => c !== x); s.coins = (s.coins || 0) + p;
-    setTimeout(() => { if (typeof pop === 'function') pop('CAR RETIRED · +' + p.toLocaleString() + ' COINS REFUNDED', '#ffd60a'); }, 900); }
+    setTimeout(() => { if (typeof pop === 'function') pop('Car retired · ' + p.toLocaleString() + ' coins refunded', '#ffd60a'); }, 900); }
   if (o.cars.some(x => CAR_ALIAS[x])) o.cars = [...new Set(o.cars.map(x => CAR_ALIAS[x] || x))]; // removed cars become their replacement
   if (!o.cars.includes('drift')) o.cars.push('drift'); return o;
 }
@@ -73,12 +73,12 @@ function shopFix() {
 }
 function addCoins(n, why) {
   n = Math.round(n); if (!(n > 0)) return; ACCT.stats.coins = coins() + n;
-  if (why && typeof pop === 'function') pop('+' + n.toLocaleString() + ' COINS' + (why === true ? '' : ' · ' + why), '#ffd60a');
+  if (why && typeof pop === 'function') pop('+' + n.toLocaleString() + ' coins' + (why === true ? '' : ' · ' + why), '#ffd60a');
 }
 function achCheck(o) {
   const s = ACCT.stats; s.ach = s.ach || {}; let got = 0;
   for (const [id, name, , ok, reward] of ACH) { if (s.ach[id]) continue; let y = false; try { y = ok(s, o); } catch (e) { } if (!y) continue;
-    s.ach[id] = Date.now(); s.coins = coins() + reward; got++; if (typeof pop === 'function') setTimeout(() => pop('🏆 ' + name.toUpperCase() + ' · +' + reward.toLocaleString() + ' COINS', '#ffd60a'), 400 + got * 900); }
+    s.ach[id] = Date.now(); s.coins = coins() + reward; got++; if (typeof pop === 'function') setTimeout(() => pop('🏆 ' + name + ' · +' + reward.toLocaleString() + ' coins', '#ffd60a'), 400 + got * 900); }
   return got;
 }
 // coins come from every session: laps, drift points, distance and wins
@@ -97,7 +97,7 @@ let BUYING = false;
 // ex: { look } shows the car, { sw: css background } shows a swatch
 async function shopBuy(kind, id, price, name, apply, ex) {
   const o = shopOwn(); ex = ex || {}; if (BUYING) return;
-  if (coins() < price) return pop('NOT ENOUGH COINS · ' + (price - coins()).toLocaleString() + ' MORE NEEDED', '#ff3b3b');
+  if (coins() < price) return pop('Need ' + (price - coins()).toLocaleString() + ' more coins', '#ff3b3b');
   const html = (ex.look ? '<canvas class="buyPrev" width="384" height="216"></canvas>' : ex.sw ? `<div class="buySw" style="background:${ex.sw}"></div>` : '')
     + `<div class="buyRow"><span>Price</span><b><i class="coin"></i>${price.toLocaleString()}</b></div><div class="buyRow"><span>You have</span><b><i class="coin"></i>${coins().toLocaleString()}</b></div><div class="buyRow"><span>After</span><b><i class="coin"></i>${(coins() - price).toLocaleString()}</b></div>`;
   BUYING = true;
@@ -106,11 +106,11 @@ async function shopBuy(kind, id, price, name, apply, ex) {
   BUYING = false; if (!ok) return;
   const allKey = kind.startsWith('all:') ? kind.slice(4) : null;
   if (allKey ? o[allKey] : o[kind].includes(id)) return;
-  if (coins() < price) return pop('NOT ENOUGH COINS · ' + (price - coins()).toLocaleString() + ' MORE NEEDED', '#ff3b3b');
+  if (coins() < price) return pop('Need ' + (price - coins()).toLocaleString() + ' more coins', '#ff3b3b');
   ACCT.stats.coins = coins() - price; o.bought = (o.bought || 0) + 1;
   if (allKey) o[allKey] = true; else o[kind].push(id);
   if (typeof sndUi === 'function') sndUi('go');
-  if (apply) apply(); achCheck(); saveCfg(); refreshMenu(); pop('BOUGHT ' + name.toUpperCase(), '#7bff4a');
+  if (apply) apply(); achCheck(); saveCfg(); refreshMenu(); pop('Unlocked · ' + name, '#7bff4a', ex.sw && ex.sw.startsWith('#') ? { sw: ex.sw } : null);
 }
 const pr = n => '🪙 ' + n.toLocaleString();
 const normHex = v => { v = String(v || '').trim(); if (!v.startsWith('#')) v = '#' + v; if (/^#[0-9a-f]{3}$/i.test(v)) v = '#' + [...v.slice(1)].map(x => x + x).join(''); return /^#[0-9a-f]{6}$/i.test(v) ? v.toLowerCase() : null; };
@@ -146,7 +146,7 @@ function shopBuild() {
     hover(d, 'body', d.dataset.car);
     d.querySelector('.shBtn').onclick = () => {
       const t = carType(d.dataset.car);
-      if (shopOwn().cars.includes(t.id)) { if (CFG.body !== t.id) { CFG.body = t.id; saveCfg(); refreshMenu(); pop('EQUIPPED THE ' + t.name.toUpperCase(), '#1ec8ff'); } }
+      if (shopOwn().cars.includes(t.id)) { if (CFG.body !== t.id) { CFG.body = t.id; saveCfg(); refreshMenu(); pop(t.name + ' equipped', '#1ec8ff'); } }
       else shopBuy('cars', t.id, SHOP.cars[t.id], 'the ' + t.name, () => { CFG.body = t.id; }, { look: Object.assign(carLook(CFG), PREV, { body: t.id }) });
     };
   });
@@ -157,8 +157,8 @@ function shopBuild() {
     cp.oninput = () => { hx.value = cp.value.toUpperCase(); hx.classList.remove('bad'); tryOn(); };
     hx.oninput = () => { const v = normHex(hx.value); hx.classList.toggle('bad', !v); if (v) { cp.value = v; tryOn(); } };
     d.querySelector('.shBtn.one').onclick = () => {
-      const c = normHex(hx.value); if (!c) return pop('THAT IS NOT A HEX CODE', '#ff3b3b');
-      if (ownsCol(cat.k, c)) { if (lc(CFG[f]) === c && cat.opt) CFG[f] = ''; else CFG[f] = c; delete PREV[f]; saveCfg(); refreshMenu(); pop((CFG[f] ? cat.name + ' set to ' + c : cat.name + ' off').toUpperCase(), '#1ec8ff'); }
+      const c = normHex(hx.value); if (!c) return pop('Enter a hex code like #FF2A2A', '#ff3b3b');
+      if (ownsCol(cat.k, c)) { if (lc(CFG[f]) === c && cat.opt) CFG[f] = ''; else CFG[f] = c; delete PREV[f]; saveCfg(); refreshMenu(); pop(CFG[f] ? cat.name + ' · ' + c.toUpperCase() : cat.name + ' off', '#1ec8ff', CFG[f] ? { sw: c } : null); }
       else shopBuy(cat.k, c, cat.cost, c.toUpperCase() + ' ' + cat.name.toLowerCase(), () => { CFG[f] = c; delete PREV[f]; }, { sw: c });
     };
     d.querySelector('.shBtn.all').onclick = () => { if (!shopOwn()[cat.all]) shopBuy('all:' + cat.all, 'all', cat.allCost, 'every ' + cat.name.toLowerCase() + ' colour', null, { sw: RAINBOW }); };
@@ -167,7 +167,7 @@ function shopBuild() {
     hover(d, 'livery', d.dataset.pat);
     d.querySelector('.shBtn').onclick = () => {
       const id = d.dataset.pat, l = LIVERIES.find(x => x.id === id);
-      if (shopOwn().pat.includes(id)) { if (carLook(CFG).livery !== id) { CFG.livery = id; saveCfg(); refreshMenu(); pop('PATTERN: ' + l.name.toUpperCase(), '#1ec8ff'); } }
+      if (shopOwn().pat.includes(id)) { if (carLook(CFG).livery !== id) { CFG.livery = id; saveCfg(); refreshMenu(); pop(l.name + ' pattern equipped', '#1ec8ff'); } }
       else shopBuy('pat', id, SHOP.patCost, 'the ' + l.name + ' pattern', () => { CFG.livery = id; }, { look: Object.assign(carLook(CFG), PREV, { livery: id }) });
     };
   });

@@ -23,6 +23,8 @@ const CAR_ALIAS = { gt: 'flat6', hatch: 'minnow', rally: 'hachi', micro: 'minnow
 const LIVERIES = [
   { id: 'clean', name: 'Clean' }, { id: 'stripe', name: 'Stripe' }, { id: 'racing', name: 'Racing' },
   { id: 'checker', name: 'Checker' }, { id: 'carbon', name: 'Carbon' }, { id: 'flame', name: 'Flame' }, { id: 'camo', name: 'Camo' }, { id: 'split', name: 'Split' }, { id: 'fade', name: 'Fade' },
+  { id: 'lemans', name: 'Le Mans' }, { id: 'arrow', name: 'Chevron' }, { id: 'tiger', name: 'Tiger' }, { id: 'honeycomb', name: 'Honeycomb' }, { id: 'circuit', name: 'Circuit' },
+  { id: 'wave', name: 'Wave' }, { id: 'shard', name: 'Shard' }, { id: 'retro', name: 'Retro' }, { id: 'pinstripe', name: 'Pinstripe' }, { id: 'drip', name: 'Drip' },
 ];
 const FINISHES = [['gloss', 'Gloss'], ['matte', 'Matte'], ['metal', 'Metallic'], ['pearl', 'Pearl']];
 const isHex = v => typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v);
@@ -50,7 +52,7 @@ function bodyPath(g, id, L, W) {
   else g.roundRect(-h, -w, L, W, id === 'muscle' ? 7 : 9);
 }
 
-function drawLivery(g, lv, col, L, W, id, a1, a2) {
+function drawLiveryBase(g, lv, col, L, W, id, a1, a2) {
   a1 = a1 || '#f4f4f4'; a2 = a2 || '#111111'; const h = L / 2, w = W / 2;
   if (lv === 'stripe') { g.fillStyle = a2; g.fillRect(-h, -4.6, L, 9.2); g.fillStyle = a1; g.fillRect(-h, -3.2, L, 6.4); }
   else if (lv === 'racing') { g.fillStyle = a2; g.fillRect(-h, -7.4, L, 5.6); g.fillRect(-h, 1.8, L, 5.6); g.fillStyle = a1; g.fillRect(-h, -6.6, L, 4); g.fillRect(-h, 2.6, L, 4); }
@@ -63,6 +65,49 @@ function drawLivery(g, lv, col, L, W, id, a1, a2) {
   else if (lv === 'split') { g.fillStyle = a1; g.beginPath(); g.moveTo(L * 0.1, -w - 1); g.lineTo(-L * 0.1, w + 1); g.lineTo(-h - 1, w + 1); g.lineTo(-h - 1, -w - 1); g.closePath(); g.fill(); g.strokeStyle = a2; g.lineWidth = 2.2; g.beginPath(); g.moveTo(L * 0.1, -w - 1); g.lineTo(-L * 0.1, w + 1); g.stroke(); }
   else if (lv === 'fade') { const gr = g.createLinearGradient(h, 0, -h, 0); gr.addColorStop(0, rgba(a1, 0)); gr.addColorStop(0.55, rgba(a1, 0.55)); gr.addColorStop(1, rgba(a1, 1)); g.fillStyle = gr; g.fillRect(-h, -w, L, W);
     const r = rnd(3); g.fillStyle = a2; for (let i = 0; i < 26; i++) { const x = -h + Math.pow(r(), 1.8) * L * 0.6; g.beginPath(); g.arc(x, -w + r() * W, 0.6 + r() * 1.1, 0, 7); g.fill(); } }
+}
+
+// newer secondary patterns (+x is the front of the car, y runs across it)
+const LV2 = {
+  lemans(g, col, L, W, a1, a2, h, w) { const b = W * 0.2; g.fillStyle = a2; g.fillRect(-h, -b - 2.6, L, 2 * b + 5.2); g.fillStyle = col; g.fillRect(-h, -b - 1.3, L, 2 * b + 2.6); g.fillStyle = a1; g.fillRect(-h, -b, L, 2 * b); },
+  arrow(g, col, L, W, a1, a2, h, w) {
+    const shape = (x0, d, t) => { g.beginPath(); g.moveTo(x0, -w - 1); g.lineTo(x0 + d, 0); g.lineTo(x0, w + 1); g.lineTo(x0 - t, w + 1); g.lineTo(x0 + d - t, 0); g.lineTo(x0 - t, -w - 1); g.closePath(); g.fill(); };
+    for (let k = 0; k < 3; k++) { const x0 = -h + L * (0.08 + k * 0.16), d = L * 0.13; g.globalAlpha = 1 - k * 0.27; g.fillStyle = a2; shape(x0 + 0.8, d, 4.8); g.fillStyle = a1; shape(x0, d, 3.4); }
+    g.globalAlpha = 1; },
+  tiger(g, col, L, W, a1, a2, h, w) { const r = rnd(11); g.fillStyle = a2;
+    for (let i = 0; i < 7; i++) { const x = -h + L * (0.06 + i * 0.125) + r() * 2; for (const s of [-1, 1]) { const len = w * (0.45 + r() * 0.42), th = 2 + r() * 1.6;
+      g.beginPath(); g.moveTo(x - th, s * (w + 1)); g.quadraticCurveTo(x + th * 0.4, s * (w - len * 0.5), x + th * 1.6 + r() * 2, s * (w - len)); g.quadraticCurveTo(x + th * 1.2, s * (w - len * 0.45), x + th, s * (w + 1)); g.closePath(); g.fill(); } } },
+  honeycomb(g, col, L, W, a1, a2, h, w) { const r = rnd(8), s = 3.1, dx = s * 1.5, dy = s * Math.sqrt(3); g.lineWidth = 0.7; g.strokeStyle = a1;
+    for (let i = 0; i * dx < L + s; i++) for (let j = -1; j * dy < W + dy; j++) { const x = -h + i * dx, y = -w + j * dy + (i % 2 ? dy / 2 : 0), a = Math.max(0, 1 - (x + h) / L * 1.35); if (a <= 0.02) continue;
+      g.globalAlpha = a; g.beginPath(); for (let k = 0; k < 6; k++) { const an = k * Math.PI / 3; g[k ? 'lineTo' : 'moveTo'](x + Math.cos(an) * s * 0.92, y + Math.sin(an) * s * 0.92); } g.closePath(); if (r() < 0.22 * a) { g.fillStyle = a2; g.fill(); } g.stroke(); }
+    g.globalAlpha = 1; },
+  circuit(g, col, L, W, a1, a2, h, w) { const r = rnd(5); g.save(); g.strokeStyle = a1; g.lineWidth = 0.9; g.shadowColor = a1; g.shadowBlur = 3;
+    for (let i = 0; i < 10; i++) { let y = -w + 2 + r() * (W - 4), x = -h - 1; g.beginPath(); g.moveTo(x, y); x += L * (0.12 + r() * 0.22); g.lineTo(x, y);
+      const ny = clampN(y + (r() < 0.5 ? -1 : 1) * (2 + r() * 5), -w + 1.5, w - 1.5); x += Math.abs(ny - y); y = ny; g.lineTo(x, y); x += L * (0.06 + r() * 0.2); g.lineTo(x, y); g.stroke();
+      g.fillStyle = a1; g.beginPath(); g.arc(x, y, 1.3, 0, 7); g.fill(); g.fillStyle = a2; g.beginPath(); g.arc(x, y, 0.55, 0, 7); g.fill(); }
+    g.restore(); },
+  wave(g, col, L, W, a1, a2, h, w) { const band = (off, amp, th, c) => { g.fillStyle = c; g.beginPath(); const N = 48, Y = i => Math.sin(i / N * Math.PI * 2.4 + off) * w * amp;
+      for (let i = 0; i <= N; i++) g[i ? 'lineTo' : 'moveTo'](-h + L * i / N, Y(i) - th); for (let i = N; i >= 0; i--) g.lineTo(-h + L * i / N, Y(i) + th); g.closePath(); g.fill(); };
+    band(0, 0.42, 3.8, a2); band(0, 0.42, 2.5, a1); band(Math.PI, 0.5, 0.9, a2); },
+  shard(g, col, L, W, a1, a2, h, w) { const r = rnd(9), C = 7, Rw = 4, X0 = -h - 2, XL = L * 0.72, P = [];
+    for (let i = 0; i <= C; i++) { P[i] = []; for (let j = 0; j <= Rw; j++) { const ed = i === 0 || i === C || j === 0 || j === Rw; P[i][j] = [X0 + XL * i / C + (ed ? 0 : (r() - 0.5) * XL / C * 0.7), -w - 2 + (W + 4) * j / Rw + (ed ? 0 : (r() - 0.5) * W / Rw * 0.6)]; } }
+    const pal = [a1, a2, mixHex(a1, a2, 0.5), mixHex(col, a1, 0.55), mixHex(col, a2, 0.4)];
+    for (let i = 0; i < C; i++) for (let j = 0; j < Rw; j++) for (const t of [[P[i][j], P[i + 1][j], P[i][j + 1]], [P[i + 1][j], P[i + 1][j + 1], P[i][j + 1]]]) {
+      const f = i / C; if (r() < f * f * 1.1) continue; g.fillStyle = pal[Math.floor(r() * pal.length)]; g.beginPath(); g.moveTo(...t[0]); g.lineTo(...t[1]); g.lineTo(...t[2]); g.closePath(); g.fill(); } },
+  retro(g, col, L, W, a1, a2, h, w) { for (let i = 0; i < 4; i++) { const c = mixHex(a1, a2, i / 3), y0 = w * 0.16 + i * 2.7, kink = -h + L * (0.3 - i * 0.05);
+    for (const s of [-1, 1]) { g.fillStyle = c; g.beginPath(); g.moveTo(h + 1, s * y0); g.lineTo(kink, s * y0); g.lineTo(kink - 4, s * (y0 + 4)); g.lineTo(-h - 1, s * (y0 + 4)); g.lineTo(-h - 1, s * (y0 + 5.9)); g.lineTo(kink - 4, s * (y0 + 5.9)); g.lineTo(kink, s * (y0 + 1.9)); g.lineTo(h + 1, s * (y0 + 1.9)); g.closePath(); g.fill(); } } },
+  pinstripe(g, col, L, W, a1, a2, h, w) { g.strokeStyle = a1; g.lineWidth = 0.8; g.beginPath(); g.roundRect(-h + 2.2, -w + 2.2, L - 4.4, W - 4.4, 6); g.stroke();
+    g.strokeStyle = a2; g.lineWidth = 0.6; g.beginPath(); g.roundRect(-h + 3.7, -w + 3.7, L - 7.4, W - 7.4, 5); g.stroke();
+    g.lineWidth = 1.5; for (const s of [-1, 1]) { g.strokeStyle = a1; g.beginPath(); g.moveTo(-h + 5, s * w * 0.62); g.bezierCurveTo(-h * 0.2, s * w * 0.62, h * 0.15, s * w * 0.12, h - 6, s * w * 0.18); g.stroke(); } },
+  drip(g, col, L, W, a1, a2, h, w) { const r = rnd(4), x0 = h - L * 0.17; g.fillStyle = a1; g.fillRect(x0, -w - 1, h - x0 + 2, W + 2);
+    for (let y = -w + 1.2; y < w; y += 3 + r() * 1.2) { const len = L * (0.04 + r() * 0.3), rw = 1 + r() * 0.7; g.fillRect(x0 - len, y - rw, len + 0.6, rw * 2); g.beginPath(); g.arc(x0 - len, y, rw * 1.3, 0, 7); g.fill(); }
+    g.fillStyle = a2; g.fillRect(x0 + 2.2, -w - 1, 1, W + 2); },
+};
+const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
+function drawLivery(g, lv, col, L, W, id, a1, a2) {
+  a1 = a1 || '#f4f4f4'; a2 = a2 || '#111111';
+  if (LV2[lv]) return LV2[lv](g, col, L, W, a1, a2, L / 2, W / 2);
+  return drawLiveryBase(g, lv, col, L, W, id, a1, a2);
 }
 
 function finishShade(g, k, L, W) {

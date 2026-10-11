@@ -16,7 +16,9 @@ applyGfx();
 const G = { state: 'menu', tr: null, me: null, rem: new Map(), cfg: null, mp: false, t0: 0, cdEnd: 0, res: new Map(), resList: null, firstFin: 0, final: false, rot: false, cam: { x: WORLD_W / 2, y: WORLD_H / 2, z: 0.5, a: 0 }, smoke: [], snow: [], acc: 0, last: 0, sendT: 0, hudT: 0, plist: [], attract: null, ai: 0 };
 const KEYS = {};
 function fmt(ms) { if (!ms) return '--'; const m = Math.floor(ms / 60000), s = (ms % 60000) / 1000; return m + ':' + s.toFixed(3).padStart(6, '0'); }
-function pop(t, col) { const d = document.createElement('div'); d.className = 'pop'; d.style.color = col || '#fff'; d.textContent = t; $('pops').appendChild(d); setTimeout(() => d.remove(), 1400); }
+function pop(t, col, o) { const box = $('pops'); if (!box) return; const d = document.createElement('div'); d.className = 'pop'; d.style.setProperty('--c', col || '#ffffff');
+  const sw = o && o.sw; d.innerHTML = sw ? '<i class="popSw"></i><span></span>' : '<i class="popDot"></i><span></span>'; if (sw) d.firstChild.style.background = sw; d.lastChild.textContent = t;
+  box.appendChild(d); while (box.children.length > 4) box.firstChild.remove(); setTimeout(() => d.classList.add('out'), 1900); setTimeout(() => d.remove(), 2300); }
 function banner(t, small) { $('banner').textContent = t; $('banner').className = small ? 'small' : ''; }
 function rec(tr) { return JSON.parse(localStorage.getItem('md_rec_' + tr) || '{}'); }
 function setRec(tr, r) { localStorage.setItem('md_rec_' + tr, JSON.stringify(r)); }
@@ -33,7 +35,7 @@ function startSession(cfg, grid, mp, rid) {
     else { const p = G.plist.find(q => q.id === id) || { name: 'Driver', color: '#888' }; const rc = newCar(slot, G.tr, id, p.name, p.color); Object.assign(rc, carLook(p)); rc.color = carLook(p).color; G.rem.set(id, { car: rc, tgt: null, raw: null }); }
   });
   G.ghost = null; G.ghostCar = null; G.curSplits = []; G.splitStart = null; G.recL = null; G.recStart = null;
-  if (G.tt) { applySpawn(G.me); const pick = G.ghostPick; G.ghostPick = null; setGhost(pick ? pick.rep : localStorage.getItem('md_rep_' + cfg.track), pick); }
+  if (G.tt) { applySpawn(G.me); const pick = G.ghostPick; G.ghostPick = null; setGhost(pick ? pick.rep : localStorage.getItem('md_rep_' + cfg.track), pick); if (!pick) pbRepCloud(cfg.track).then(r => { if (r && G.tt && G.cfg.track === cfg.track && (!G.ghostCar || G.ghostCar.own)) setGhost(r, null); }); }
   G.cam.x = G.me.x; G.cam.y = G.me.y; G.cam.a = -G.me.a - Math.PI / 2;
   for (const s of ['menu', 'lobby', 'board']) $(s).classList.add('hidden');
   for (const s of ['hud', 'speedo', 'mini']) $(s).classList.remove('hidden');
@@ -53,9 +55,10 @@ function progress(c, i, now) {
   c.prog = i;
 }
 function onLap(c, lt, now) {
-  const rep = c === G.me ? encRep(G.recL) : null, sr = splitRef(); if (sr && sr.lap) showDelta(lt - sr.lap);
-  let pb = false; if (!TRACKS[G.cfg.track].test) { const r = rec(G.cfg.track); if (!r.lap || lt < r.lap) { r.lap = lt; pb = true; setRec(G.cfg.track, r); }
-  if (ACCT.lap(G.cfg.track, lt, c.score + c.cur, rep)) pb = true; }
+  const tr = G.cfg.track, rep = c === G.me ? encRep(G.recL) : null, sr = splitRef(), best0 = pbBest(tr), ref = best0 || (sr && sr.lap) || 0;
+  if (ref) showDelta(lt - ref);
+  let pb = false; if (!TRACKS[tr].test) { const r = rec(tr); if (!r.lap || lt < r.lap) { r.lap = lt; setRec(tr, r); }
+  ACCT.lap(tr, lt, c.score + c.cur, rep); pb = !best0 || lt < best0; }
   lapExtras(lt, rep, pb, sr); ACCT.stats.laps++; if (G.tt) G.tt.laps++;
   pop((G.cfg.laps && (c.lap >= G.cfg.laps || G.flag) ? 'FINAL LAP ' : 'LAP ') + fmt(lt) + (pb ? '  ★ PB' : ''), pb ? '#7dff9a' : '#fff');
   if (G.cfg.laps && !G.flag && c.lap === G.cfg.laps - 1) setTimeout(() => pop('FINAL LAP!', '#ffe14d'), 700);
@@ -110,8 +113,7 @@ function tickInner(ts, bg) {
   if (G.state === 'countdown') { const left = G.cdEnd - now; banner(left > 0 ? (G.cfg.laps ? String(Math.ceil(left / 1000)) : '') : ''); if (left <= 0) { G.state = 'race'; if (G.tt) G.tt.start = now; if (G.cfg.laps) { banner('GO!'); setTimeout(() => { if ($('banner').textContent === 'GO!') banner(''); }, 900); } } }
   G.acc += dt; let inp = inputs();
   if (!racing) inp = { hb: true }; else if (me.finished) inp = { down: me.vF > 30 };
-  while (G.acc >= STEP) { G.acc -= STEP; me.px = me.x; me.py = me.y; me.pa = me.a; const ox = me.x, oy = me.y, nr = stepCar(me, inp, STEP, G.tr); if (racing && !me.finished) { const tn = performance.now(); gateCross(me, ox, oy, tn); progress(me, nr.i, tn); } }
-  if (racing && !me.finished && me.lap >= 0) { if (G.recStart !== me.lapStart) { G.recStart = me.lapStart; G.recL = []; G.recK = -1; } const k = Math.floor((performance.now() - me.lapStart) / 100); if (k > G.recK) { G.recK = k; G.recL.push([Math.round(me.x), Math.round(me.y), Math.round(me.a * 100)]); } }
+  while (G.acc >= STEP) { G.acc -= STEP; me.px = me.x; me.py = me.y; me.pa = me.a; const ox = me.x, oy = me.y, nr = stepCar(me, inp, STEP, G.tr); if (racing && !me.finished) { const tn = now - G.acc * 1000; gateCross(me, ox, oy, tn); progress(me, nr.i, tn); if (me.lap >= 0) recSample(me, ox, oy, me.pa, tn); } }
   // drift scoring
   if (racing && !me.finished) {
     G.dist += me.speed * dt;
@@ -182,11 +184,11 @@ function applySpawn(c) {
 function setGhost(rep, pick) {
   const L = decRep(rep); G.ghost = L; G.ghostCar = null; if (!L) return;
   const gc = newCar(0, G.tr, 'ghost', !pick || pick.own ? 'PB' : pick.name + (pick.wr ? ' [WR]' : ''), (pick && pick.color) || CFG.color);
-  Object.assign(gc, carLook(pick && !pick.own ? pick : CFG)); gc.finished = 1; gc.own = !pick; G.ghostCar = gc;
+  Object.assign(gc, carLook(pick && !pick.own ? pick : CFG)); gc.finished = 1; gc.own = !pick || !!pick.own; G.ghostCar = gc;
 }
-function ghostCars() {
-  const gc = G.ghostCar, L = G.ghost, me = G.me; if (!gc || !L || G.state !== 'race' || !me || me.lap < 0 || me.finished) return [];
-  const k = (performance.now() - me.lapStart) / 100, i = Math.floor(k); if (i < 0 || i >= L.length - 1) return [];
+// pose a ghost car at sample index k (fractional) of a decoded replay; false when k is outside the lap
+function ghostPose(L, k, gc) {
+  const i = Math.floor(k); if (!L || i < 0 || i >= L.length - 1) return false;
   const f = k - i, P = L[Math.max(0, i - 1)], A = L[i], B = L[i + 1], Q = L[Math.min(L.length - 1, i + 2)], f2 = f * f, f3 = f2 * f;
   const cr = (p0, p1, p2, p3) => 0.5 * (2 * p1 + (p2 - p0) * f + (2 * p0 - 5 * p1 + 4 * p2 - p3) * f2 + (3 * p1 - p0 - 3 * p2 + p3) * f3);
   const cd = (p0, p1, p2, p3) => 0.5 * ((p2 - p0) + 2 * (2 * p0 - 5 * p1 + 4 * p2 - p3) * f + 3 * (3 * p1 - p0 - 3 * p2 + p3) * f2);
@@ -194,11 +196,44 @@ function ghostCars() {
   const far = Math.hypot(B[0] - A[0], B[1] - A[1]) > 300 || Math.hypot(P[0] - A[0], P[1] - A[1]) > 300 || Math.hypot(Q[0] - B[0], Q[1] - B[1]) > 300;
   if (far) { gc.x = A[0] + (B[0] - A[0]) * f; gc.y = A[1] + (B[1] - A[1]) * f; gc.a = a1 + (a2 - a1) * f; gc.vx = (B[0] - A[0]) * 10; gc.vy = (B[1] - A[1]) * 10; }
   else { gc.x = cr(P[0], A[0], B[0], Q[0]); gc.y = cr(P[1], A[1], B[1], Q[1]); gc.a = cr(a0, a1, a2, a3); gc.vx = cd(P[0], A[0], B[0], Q[0]) * 10; gc.vy = cd(P[1], A[1], B[1], Q[1]) * 10; }
-  gc.speed = Math.hypot(gc.vx, gc.vy); return [gc];
+  gc.speed = Math.hypot(gc.vx, gc.vy); return true;
+}
+function ghostCars() {
+  const gc = G.ghostCar, L = G.ghost, me = G.me; if (!gc || !L || G.state !== 'race' || !me || me.lap < 0 || me.finished) return [];
+  return ghostPose(L, (performance.now() - me.lapStart) / 100, gc) ? [gc] : [];
+}
+// record one sample every 100 ms of lap time, interpolated inside the physics step so laps never drift or skip on slow frames
+function recSample(c, ox, oy, oa, t1) {
+  if (G.recStart !== c.lapStart) { G.recStart = c.lapStart; G.recK = 0; G.recL = [[Math.round(c.x), Math.round(c.y), Math.round(c.a * 100)]]; return; }
+  const t0 = t1 - STEP * 1000;
+  while (G.recL.length < 36000 && c.lapStart + (G.recK + 1) * 100 <= t1 + 0.01) {
+    const k = ++G.recK, f = Math.max(0, Math.min(1, (c.lapStart + k * 100 - t0) / (t1 - t0))), a = oa + angDiff(c.a, oa) * f;
+    G.recL.push([Math.round(ox + (c.x - ox) * f), Math.round(oy + (c.y - oy) * f), Math.round(a * 100)]);
+  }
+}
+// your account PB ghost from the leaderboard, when it is faster than (or missing from) the one on this device
+const PBREP = {};
+function pbRepCloud(tr) {
+  if (typeof CLOUD === 'undefined' || !CLOUD || !ACCT.pub || !ACCT.reg) return Promise.resolve(null);
+  if (PBREP[tr]) return PBREP[tr];
+  return PBREP[tr] = (async () => {
+    const loc = localStorage.getItem('md_rep_' + tr), lms = +localStorage.getItem('md_repms_' + tr) || 0;
+    try {
+      const r = await Promise.race([sb('GET', `laps?track=eq.${tr}&pid=eq.${encodeURIComponent(ACCT.pub)}&select=replay,lap_ms`), new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 5000))]);
+      const row = r && r[0]; if (!row || !decRep(row.replay)) return null;
+      if (decRep(loc) && lms && lms <= row.lap_ms) return null;
+      if (decRep(loc) && !lms && row.lap_ms > pbBest(tr) + 1) return null;
+      try { localStorage.setItem('md_rep_' + tr, row.replay); localStorage.setItem('md_repms_' + tr, String(row.lap_ms)); } catch (e) { }
+      return row.replay;
+    } catch (e) { delete PBREP[tr]; return null; }
+  })();
 }
 // ---------- checkpoint deltas against your best lap ----------
 function splitRef() { try { const r = JSON.parse(localStorage.getItem('md_split_' + G.cfg.track) || 'null'); return r && r.n === G.tr.n && r.k === G.tr.gates.length && Array.isArray(r.s) ? r : null; } catch (e) { return null; } }
-function splitAt(j, t) { if (G.splitStart !== G.me.lapStart) { G.splitStart = G.me.lapStart; G.curSplits = []; } G.curSplits[j] = t; const r = splitRef(); if (r && r.s[j]) showDelta(t - r.s[j]); }
+function splitAt(j, t) { if (G.splitStart !== G.me.lapStart) { G.splitStart = G.me.lapStart; G.curSplits = []; } G.curSplits[j] = t; const r = splitRef(); if (!r || !(r.s[j] > 0)) return;
+  const b = pbBest(G.cfg.track), sc = b && r.lap > b ? b / r.lap : 1; showDelta(t - r.s[j] * sc); } // old split sets from a slower lap get scaled to your real PB
+function fullSplits(S, K) { if (!S || S.length !== K) return false; for (let j = 0; j < K; j++) if (!(S[j] > 0)) return false; return true; }
+function pbBest(tr) { const a = [rec(tr).lap, ACCT.bestLap(tr)].filter(x => x > 0); return a.length ? Math.min(...a) : 0; }
 function showDelta(d) {
   let el = $('hDelta'); if (!el) { el = document.createElement('div'); el.id = 'hDelta'; el.style.cssText = 'position:fixed;top:78px;left:50%;transform:translateX(-50%);font-size:32px;font-weight:900;font-style:italic;font-variant-numeric:tabular-nums;text-shadow:0 3px 10px rgba(0,0,0,.85);pointer-events:none;z-index:30;transition:opacity .4s;opacity:0'; document.body.appendChild(el); }
   const r = Math.round(d); el.textContent = r === 0 ? '=0.000' : (r > 0 ? '+' : '-') + (Math.abs(r) / 1000).toFixed(3);
@@ -206,9 +241,9 @@ function showDelta(d) {
 }
 function lapExtras(lt, rep, pb, sr) {
   const K = G.tr.gates.length, S = G.curSplits || [];
-  if (S.length === K && S.every(x => x > 0) && (!sr || lt < sr.lap)) { try { localStorage.setItem('md_split_' + G.cfg.track, JSON.stringify({ lap: Math.round(lt), s: S.map(Math.round), n: G.tr.n, k: K })); } catch (e) { } }
+  if (fullSplits(S, K) && (pb || !sr || lt < sr.lap)) { try { localStorage.setItem('md_split_' + G.cfg.track, JSON.stringify({ lap: Math.round(lt), s: S.map(Math.round), n: G.tr.n, k: K })); } catch (e) { } }
   G.curSplits = []; G.splitStart = G.me.lapStart;
-  if (pb && rep) { try { localStorage.setItem('md_rep_' + G.cfg.track, rep); } catch (e) { } if (G.tt && (!G.ghostCar || G.ghostCar.own)) setGhost(rep, null); }
+  if (pb && rep) { try { localStorage.setItem('md_rep_' + G.cfg.track, rep); localStorage.setItem('md_repms_' + G.cfg.track, String(Math.round(lt))); } catch (e) { } G.attract = null; if (PBREP[G.cfg.track]) delete PBREP[G.cfg.track]; if (G.tt && (!G.ghostCar || G.ghostCar.own)) setGhost(rep, null); }
 }
 
 // ===== Smooth remote cars: snapshot interpolation =====
@@ -253,7 +288,7 @@ function gateCross(c, ox, oy, now) {
     const t = s0 / (s0 - s1), lx = ox + (c.x - ox) * t - p[0], ly = oy + (c.y - oy) * t - p[1], lat = -lx * fy + ly * fx;
     if (lat < -gateW(G.tr, q, -1) - 6 || lat > gateW(G.tr, q, 1) + 6) continue;
     c.gp[k] = true; c.seg = c.gp.filter(Boolean).length; c.ng = c.seg; c.cpI = (q.i + 3) % G.tr.n;
-    if (c === G.me) { if (G.tt) G.tt.cps++; splitAt(k, now - c.lapStart); const mk = missedGate(c); if (mk >= 0 && c.missK !== mk) pop('MISSED A CHECKPOINT · FOLLOW THE ARROW', '#ff3b3b'); c.missK = mk; }
+    if (c === G.me) { if (G.tt) G.tt.cps++; splitAt(k, now - (1 - t) * STEP * 1000 - c.lapStart); const mk = missedGate(c); if (mk >= 0 && c.missK !== mk) pop('MISSED A CHECKPOINT · FOLLOW THE ARROW', '#ff3b3b'); c.missK = mk; }
   }
 }
 // index of the first gate not yet passed this lap (the one highlighted yellow)

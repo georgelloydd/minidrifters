@@ -33,15 +33,33 @@ const ACCT = {
     if (data) { this.stats = Object.assign(blankStats(), data.stats || {}); if (data.cfg) { Object.assign(CFG, data.cfg); } }
     else this.stats = blankStats();
     this.reg = !!(data && data.reg); if (!this.reg) CFG.name = GUEST_NAME; loadTweaks();
+    this.admV = Math.max((data && data.admV) || 0, (data && data.adm && data.adm.v) || 0);
     this.save(true); if (CLOUD && this.reg) { this.save(); syncBests(false); this.register(); LB.flush(); }
     return !!data;
   },
   // lets the admin dev site look up a forgotten key by player name (needs register_key from supabase-admin.sql; silently skipped if missing)
   register() { if (CLOUD && this.key && this.reg) sb('POST', 'rpc/register_key', { p_key: this.key, p_name: CFG.name }).catch(() => { }); },
-  data() { return { cfg: Object.assign({ name: CFG.name }, carLook(CFG)), stats: this.stats, reg: this.reg, pub: this.pub }; },
+  data() { return { cfg: Object.assign({ name: CFG.name }, carLook(CFG)), stats: this.stats, reg: this.reg, pub: this.pub, admV: this.admV || 0 }; },
   save(localOnly) {
     if (!this.key) return; localStorage.setItem('md_acct_' + this.key, JSON.stringify(this.data()));
-    if (CLOUD && this.reg && !localOnly) { clearTimeout(this._t); this._t = setTimeout(() => sb('POST', 'profiles', { id: this.priv, data: this.data(), updated_at: new Date().toISOString() }, 'resolution=merge-duplicates,return=minimal').catch(() => { }), 800); this.syncColor(); }
+    if (CLOUD && this.reg && !localOnly) { clearTimeout(this._t); this._t = setTimeout(() => this.pushCloud(), 800); this.syncColor(); }
+  },
+  // the dev site writes data.adm = { v, coins, own }; apply it before our next save so it never gets overwritten
+  async checkAdm() {
+    if (!CLOUD || !this.reg || !this.priv) return false;
+    try { const r = await sb('GET', 'profiles?id=eq.' + this.priv + '&select=adm:data->adm'); const a = r && r[0] && r[0].adm; if (a && a.v > (this.admV || 0)) { this.applyAdm(a); return true; } } catch (e) { }
+    return false;
+  },
+  applyAdm(a) {
+    this.admV = a.v; if (typeof a.coins === 'number' && isFinite(a.coins)) this.stats.coins = Math.max(0, Math.round(a.coins));
+    if (a.own && typeof a.own === 'object') this.stats.own = JSON.parse(JSON.stringify(a.own));
+    if (typeof shopFix === 'function') shopFix(); localStorage.setItem('md_acct_' + this.key, JSON.stringify(this.data()));
+    if (typeof refreshMenu === 'function') try { refreshMenu(); } catch (e) { }
+    if (typeof pop === 'function') pop('Your coins and inventory were updated', '#ffd60a');
+  },
+  async pushCloud() {
+    await this.checkAdm();
+    sb('POST', 'profiles', { id: this.priv, data: this.data(), updated_at: new Date().toISOString() }, 'resolution=merge-duplicates,return=minimal').catch(() => { });
   },
   // push a paint change onto every leaderboard time this player owns, so all tables show the new colour
   syncColor() {
@@ -219,3 +237,6 @@ async function lbLooks(rows) {
     for (const p of need) if (!(p in LOOKS)) LOOKS[p] = undefined; for (const x of r || []) if (x && x.pub && x.cfg) LOOKS[x.pub] = carLook(x.cfg);
   } catch (e) { }
 }
+
+// check for dev-site inventory changes while sitting in the menus
+setInterval(() => { try { if (typeof G !== 'undefined' && (G.state === 'menu' || G.state === 'lobby')) ACCT.checkAdm(); } catch (e) { } }, 45000);
