@@ -125,7 +125,7 @@ function drawUnderglow(g, col, L, W, night) {
   const rr = (x, y, w, h, r) => { g.beginPath(); r = Math.min(r, w / 2, h / 2); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
   g.save(); g.globalCompositeOperation = 'lighter';
   { const m = g.getTransform(), sc = Math.hypot(m.a, m.b) || 1; // smooth haze via shadow blur (no visible banding)
-    g.save(); g.translate(0, -4000); g.shadowOffsetY = 4000 * sc; g.shadowColor = rgba(col, 0.55 * Math.min(1, p)); g.fillStyle = '#000';
+    g.save(); g.translate(0, -4000); g.shadowOffsetX = m.c * 4000; g.shadowOffsetY = m.d * 4000; // offset in screen space so it lines up at any car angle g.shadowColor = rgba(col, 0.55 * Math.min(1, p)); g.fillStyle = '#000';
     g.shadowBlur = 34 * sc; rr(-L * 0.5, -W * 0.52, L, W * 1.04, W * 0.35); g.fill();
     g.shadowColor = rgba(col, 0.7 * Math.min(1, p)); g.shadowBlur = 14 * sc; rr(-L * 0.46, -W * 0.5, L * 0.92, W, W * 0.3); g.fill(); g.restore(); }
   const gg = g.createRadialGradient(0, 0, 2, 0, 0, L * 0.62); gg.addColorStop(0, rgba(col, 0.5 * p)); gg.addColorStop(0.7, rgba(col, 0.16 * p)); gg.addColorStop(1, rgba(col, 0));
