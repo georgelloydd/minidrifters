@@ -119,11 +119,28 @@ function finishShade(g, k, L, W) {
   else { gr.addColorStop(0.3, 'rgba(255,255,255,0)'); gr.addColorStop(0.42, 'rgba(255,255,255,.2)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); }
   g.fillStyle = gr; g.fillRect(-h, -w, L, W);
 }
+// neon underglow: soft car-shaped haze, a bright pool under the floor and light tubes along the sills, with a gentle pulse
+function drawUnderglow(g, col, L, W, night) {
+  const t = performance.now() / 1000, p = (0.9 + 0.1 * Math.sin(t * 2.6)) * (night ? 1.25 : 1), hot = typeof shadeHex === 'function' ? shadeHex(col, 1.7) : '#ffffff';
+  const rr = (x, y, w, h, r) => { g.beginPath(); r = Math.min(r, w / 2, h / 2); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); };
+  g.save(); g.globalCompositeOperation = 'lighter';
+  { const m = g.getTransform(), sc = Math.hypot(m.a, m.b) || 1; // smooth haze via shadow blur (no visible banding)
+    g.save(); g.translate(0, -4000); g.shadowOffsetY = 4000 * sc; g.shadowColor = rgba(col, 0.55 * Math.min(1, p)); g.fillStyle = '#000';
+    g.shadowBlur = 34 * sc; rr(-L * 0.5, -W * 0.52, L, W * 1.04, W * 0.35); g.fill();
+    g.shadowColor = rgba(col, 0.7 * Math.min(1, p)); g.shadowBlur = 14 * sc; rr(-L * 0.46, -W * 0.5, L * 0.92, W, W * 0.3); g.fill(); g.restore(); }
+  const gg = g.createRadialGradient(0, 0, 2, 0, 0, L * 0.62); gg.addColorStop(0, rgba(col, 0.5 * p)); gg.addColorStop(0.7, rgba(col, 0.16 * p)); gg.addColorStop(1, rgba(col, 0));
+  g.fillStyle = gg; g.beginPath(); g.ellipse(0, 0, L * 0.64, W * 0.95, 0, 0, 7); g.fill();
+  for (const sy of [-1, 1]) { const y = sy * W * 0.53, lg = g.createLinearGradient(0, y - 6, 0, y + 6);
+    lg.addColorStop(0, rgba(col, 0)); lg.addColorStop(0.5, rgba(col, 0.75 * p)); lg.addColorStop(1, rgba(col, 0)); g.fillStyle = lg; rr(-L * 0.4, y - 6, L * 0.8, 12, 6); g.fill();
+    g.fillStyle = rgba(hot, 0.55 * p); rr(-L * 0.34, y - 0.9, L * 0.68, 1.8, 1); g.fill(); }
+  for (const sx of [-1, 1]) { const x = sx * L * 0.5, lg = g.createLinearGradient(x - 6, 0, x + 6, 0); lg.addColorStop(0, rgba(col, 0)); lg.addColorStop(0.5, rgba(col, 0.35 * p)); lg.addColorStop(1, rgba(col, 0)); g.fillStyle = lg; g.fillRect(x - 6, -W * 0.3, 12, W * 0.6); }
+  g.restore();
+}
 function drawCar(g, c, night) {
   const t = carType(c.body), id = t.id, L = CAR.L * t.l, W = CAR.W * t.w, h = L / 2, w = W / 2, col = c.color || '#ff3b3b', lv = c.livery || 'clean';
   g.save(); g.translate(c.x, c.y); g.rotate(c.a);
   if (night) { g.save(); g.globalCompositeOperation = 'lighter'; const gr = g.createRadialGradient(h, 0, 4, h + 170, 0, 230); gr.addColorStop(0, 'rgba(255,240,200,.2)'); gr.addColorStop(1, 'rgba(255,240,200,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(h * 0.9, -w * 0.7); g.lineTo(h + 250, -110); g.lineTo(h + 250, 110); g.lineTo(h * 0.9, w * 0.7); g.fill(); g.restore(); }
-  if (c.glow) { g.save(); g.globalCompositeOperation = 'lighter'; const gg = g.createRadialGradient(0, 0, 3, 0, 0, L * 0.8); gg.addColorStop(0, rgba(c.glow, 0.6)); gg.addColorStop(0.6, rgba(c.glow, 0.22)); gg.addColorStop(1, rgba(c.glow, 0)); g.fillStyle = gg; g.beginPath(); g.ellipse(0, 0, L * 0.8, W * 1.05, 0, 0, 7); g.fill(); g.restore(); }
+  if (c.glow) drawUnderglow(g, c.glow, L, W, night);
   // shadow
   g.fillStyle = 'rgba(0,0,0,.38)'; g.save(); g.translate(5, 7); bodyPath(g, id, L, W); g.fill(); g.restore();
   // wheels

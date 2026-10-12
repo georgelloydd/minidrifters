@@ -397,3 +397,26 @@ input[type=color]:hover{border-color:#4a4a52}
 .musSet{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:14px 16px;margin:0 0 14px;background:#101012;border:1px solid rgba(255,255,255,.08);border-radius:10px}
 .musSet .musL{display:flex;flex-direction:column;gap:2px;min-width:220px}.musSet small{color:#8b8b93}.musSet #musVol{width:200px;accent-color:#ff3b3b;padding:0}.musSet #musPct{width:40px;font-weight:800}
 .musSet .musNowS{margin-left:auto}.musSet .musNowS b{color:#fff}
+
+/* black dialogs (were navy) */
+.dlgOv{background:rgba(0,0,0,.72)}
+.dlg{background:linear-gradient(170deg,#18181b,#0a0a0c 80%);border:1px solid #2a2a30;border-top:3px solid var(--red);border-radius:10px}
+.dlg.buyDlg{border-top-color:var(--gold)}
+.dlgBody{color:#c9c9d0}.dlgHint{color:#8a8a94}
+.dlgBtn{background:#141417;border:1px solid #2a2a30;box-shadow:0 3px 0 #000}.dlgBtn:hover{border-color:#4a4a52}
+.dlgBtn.primary,.dlgBtn.danger{background:var(--red);border-color:#ff7070}.dlgBtn.gold{background:var(--gold);border-color:#fff1a0;color:#1a1300}
+.dlgCopy{background:#050505;border:1px solid #2a2a30}
+.buySw{border:1px solid #2a2a30}.buyRow{border-bottom:1px dashed #2a2a30}
+.buyPrev{border:1px solid #2a2a30;border-radius:8px}
+/* shop preview: turntable + test drive */
+#shPrev{cursor:grab;touch-action:pan-y}#shPrev.drag{cursor:grabbing}
+.shPrevBar{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px}
+.shPrevBar .tdBtn{background:var(--gold);color:#1a1300;border:0;border-radius:6px;padding:7px 14px;font-weight:900;font-style:italic;text-transform:uppercase;cursor:pointer}
+.shPrevBar .tdBtn:hover{filter:brightness(1.1)}
+.shCard[data-car],.shCard[data-pat]{cursor:pointer}.shCard.pin{border-color:var(--gold)!important;box-shadow:0 0 0 1px var(--gold)}
+.shPrevTip{color:#8a8a94;font-size:12px}
+#tdTag{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:60;background:rgba(10,10,12,.88);border:1px solid var(--gold);color:var(--gold);padding:6px 14px;border-radius:20px;font:800 12px Segoe UI,system-ui,sans-serif;letter-spacing:1px;text-transform:uppercase;pointer-events:none}
+
+/* underglow swatch: a car silhouette sitting on its neon */
+.shGlow{position:relative;background:radial-gradient(ellipse 46% 40% at 50% 50%,var(--c),transparent 72%),radial-gradient(ellipse 70% 60% at 50% 50%,color-mix(in srgb,var(--c) 35%,transparent),transparent 75%),#0a0a0c!important}
+.shGlow::after{content:'';position:absolute;left:30%;right:30%;top:34%;bottom:34%;border-radius:8px;background:linear-gradient(180deg,#1c1c20,#0c0c0e);box-shadow:0 0 0 1px rgba(255,255,255,.06),0 -2px 10px var(--c),0 2px 10px var(--c)}

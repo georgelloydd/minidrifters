@@ -39,7 +39,7 @@ const ACCT = {
   },
   // lets the admin dev site look up a forgotten key by player name (needs register_key from supabase-admin.sql; silently skipped if missing)
   register() { if (CLOUD && this.key && this.reg) sb('POST', 'rpc/register_key', { p_key: this.key, p_name: CFG.name }).catch(() => { }); },
-  data() { return { cfg: Object.assign({ name: CFG.name }, carLook(CFG)), stats: this.stats, reg: this.reg, pub: this.pub, admV: this.admV || 0 }; },
+  data() { return { cfg: Object.assign({ name: CFG.name }, carLook((typeof G !== "undefined" && G.preview) || CFG)), stats: this.stats, reg: this.reg, pub: this.pub, admV: this.admV || 0 }; },
   save(localOnly) {
     if (!this.key) return; localStorage.setItem('md_acct_' + this.key, JSON.stringify(this.data()));
     if (CLOUD && this.reg && !localOnly) { clearTimeout(this._t); this._t = setTimeout(() => this.pushCloud(), 800); this.syncColor(); }
@@ -63,7 +63,7 @@ const ACCT = {
   },
   // push a paint change onto every leaderboard time this player owns, so all tables show the new colour
   syncColor() {
-    const lk = JSON.stringify(carLook(CFG)), k = 'md_looksync_' + this.key; if (!CLOUD || !this.reg || localStorage.getItem(k) === lk) return;
+    const lk = JSON.stringify(carLook((typeof G !== "undefined" && G.preview) || CFG)), k = 'md_looksync_' + this.key; if (!CLOUD || !this.reg || localStorage.getItem(k) === lk) return;
     clearTimeout(this._ct); this._ct = setTimeout(() => sb('POST', 'rpc/set_look', { p_key: this.key, p_look: JSON.parse(lk) }).then(() => localStorage.setItem(k, lk))
       .catch(() => sb('POST', 'rpc/set_color', { p_key: this.key, p_color: CFG.color }).catch(() => { })), 1200);
   },
@@ -142,7 +142,7 @@ async function submitLap(tr, e) {
   // clean every value first: Postgres answers 400 to anything out of range (e.g. a drift score past the int limit) or not valid json
   const I = 2147483647, toInt = v => Math.max(0, Math.min(I, Math.round(+v || 0)));
   const base = { p_track: toInt(tr), p_pid: String(e.pid || ACCT.pub).slice(0, 24), p_name: String(CFG.name || 'Driver').slice(0, 14), p_color: isHex(CFG.color) ? CFG.color : '#ff3b3b', p_body: String(CFG.body || 'drift').slice(0, 24), p_lap_ms: toInt(e.lap), p_score: toInt(e.score) };
-  let look = null; try { look = JSON.parse(JSON.stringify(carLook(CFG))); if (!look || JSON.stringify(look).length > 3500) look = null; } catch (er) { look = null; }
+  let look = null; try { look = JSON.parse(JSON.stringify(carLook((typeof G !== "undefined" && G.preview) || CFG))); if (!look || JSON.stringify(look).length > 3500) look = null; } catch (er) { look = null; }
   let rep = typeof e.rep === 'string' ? e.rep : null; try { if (rep && (rep.length > 200000 || !decRep(rep))) rep = null; } catch (er) { rep = null; }
   const tries = []; if (rep && look) tries.push(Object.assign({ p_replay: rep, p_look: look }, base)); if (rep) tries.push(Object.assign({ p_replay: rep }, base)); if (look && !rep) tries.push(Object.assign({ p_replay: null, p_look: look }, base)); tries.push(base);
   const perm = er => { const m = /\((\d{3})\)/.exec(er.message), s = m ? +m[1] : 0; if (s >= 400 && s < 500 && s !== 408 && s !== 429) er.perm = true; return er; };

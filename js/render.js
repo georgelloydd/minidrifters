@@ -94,6 +94,7 @@ function renderAttract(dt) {
   drawWorld(tr, cam, [car], false);
 }
 function toMenu() {
+  if (G.preview && typeof endTestDrive === 'function') endTestDrive();
   if (G.mp) netLeave(); G.mp = false; G.state = 'menu'; G.snow = [];
   for (const s of ['hud', 'speedo', 'mini', 'board', 'driftBox', 'lobby', 'hKeys']) $(s).classList.add('hidden'); $('menu').classList.remove('hidden'); banner(''); if (window.refreshMenu) refreshMenu(); sndUpdate({ speed: 0 }, false);
 }

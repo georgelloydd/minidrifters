@@ -55,6 +55,7 @@ function progress(c, i, now) {
   c.prog = i;
 }
 function onLap(c, lt, now) {
+  if (G.preview) { pop('LAP ' + fmt(lt) + ' · test drive', '#ffd60a'); return; }
   const tr = G.cfg.track, rep = c === G.me ? encRep(G.recL) : null, sr = splitRef(), best0 = pbBest(tr), ref = best0 || (sr && sr.lap) || 0;
   if (ref) showDelta(lt - ref);
   let pb = false; if (!TRACKS[tr].test) { const r = rec(tr); if (!r.lap || lt < r.lap) { r.lap = lt; setRec(tr, r); }
@@ -164,7 +165,7 @@ function ttCheckpoint() {
 }
 function endTT() {
   const c = G.me; bankDrift(c); G.state = 'over'; banner(''); const T = G.tt, driven = T.start ? performance.now() - T.start : 0, km = G.dist * 0.0000694;
-  ACCT.addSession({ laps: 0, drift: c.score, dist: km });
+  if (!G.preview) ACCT.addSession({ laps: 0, drift: c.score, dist: km });
   const ab = ACCT.bestLap(G.cfg.track);
   $('board').innerHTML = `<h2>⏱ TIME TRIAL · ${esc(G.tr.name)}</h2><div class="sum"><div><small>LAPS</small><b>${T.laps}</b></div><div><small>BEST LAP</small><b>${fmt(c.best)}</b></div><div><small>TIME DRIVEN</small><b>${fmt(driven)}</b></div><div><small>DRIFT POINTS</small><b>${c.score.toLocaleString()}</b></div><div><small>DISTANCE</small><b>${km.toFixed(2)} km</b></div><div><small>RESTARTS</small><b>${T.restarts}</b></div></div><p style="opacity:.7;text-align:center">Your all-time best here: ${fmt(ab)}</p><button class="btn primary" onclick="startSession(G.cfg,null,false)">Keep driving</button><button class="btn dark" onclick="toMenu();setTab('lb')">Leaderboards</button><button class="btn dark" onclick="toMenu()">Menu</button>`;
   $('board').classList.remove('hidden');

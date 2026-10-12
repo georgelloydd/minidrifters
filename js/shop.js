@@ -124,15 +124,34 @@ function toShopBtn(row, show) {
 const PREV = {}; // what the big shop preview is trying on (not saved until bought + equipped)
 function shopPrevDraw() {
   const cv = $('shPrev'); if (!cv) return; const look = Object.assign(carLook(CFG), PREV);
-  drawCarPreview(cv, look, -0.5);
+  drawPrevSmoke(cv, look, SPIN.a); drawCarPreview(cv, look, SPIN.a, true);
   const t = carType(look.body), tried = Object.keys(PREV).length;
   $('shPrevDesc').textContent = t.name.toUpperCase() + (tried ? ' · previewing, not equipped' : ' · your current car');
   $('shPrevReset').classList.toggle('hidden', !tried);
+  document.querySelectorAll('#shopRoot [data-car],#shopRoot [data-pat]').forEach(d => d.classList.toggle('pin', d.dataset.car ? PREV.body === d.dataset.car && d._pin : PREV.livery === d.dataset.pat && d._pin));
 }
+const SPIN = { a: -0.5, drag: null, idle: 0, raf: 0 };
+function drawPrevSmoke(cv, look, a) { cv._smoke = look.smoke ? { c: look.smoke, a } : null; }
+function prevSmokeLayer(cv) { const sm = cv._smoke; if (!sm) return; const g = cv.getContext('2d'), s = Math.min(cv.width / 84, cv.height / 54), t = performance.now() / 1000;
+  g.save(); g.globalCompositeOperation = 'destination-over'; g.translate(cv.width / 2, cv.height / 2); g.scale(s, s); g.rotate(sm.a);
+  for (let i = 0; i < 14; i++) { const k = ((t * 0.6 + i / 14) % 1), x = -16 - k * 34, y = (i % 2 ? 7 : -7) + Math.sin(i * 7.3 + t) * (2 + k * 8), r = 3 + k * 9;
+    g.globalAlpha = 0.5 * (1 - k); g.fillStyle = sm.c; g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
+  g.restore(); }
+function spinLoop() { SPIN.raf = 0; const cv = $('shPrev'); if (!cv || typeof TAB === 'undefined' || TAB !== 'shop' || G.state !== 'menu' || document.hidden) return;
+  if (!SPIN.drag && performance.now() > SPIN.idle) SPIN.a += 0.006; shopPrevDraw(); prevSmokeLayer(cv); SPIN.raf = requestAnimationFrame(spinLoop); }
+function spinStart() { if (!SPIN.raf) SPIN.raf = requestAnimationFrame(spinLoop); }
+setInterval(spinStart, 500);
+// try-on drive: your current look + whatever you're previewing. Nothing is saved, no laps or coins count.
+function testDrive() {
+  if (G.state !== 'menu') return; G.preview = JSON.parse(JSON.stringify(CFG)); Object.assign(CFG, PREV);
+  G.plist = []; startSession({ track: CFG.track, laps: 0, mode: 'tt' }, null, false);
+  let t = $('tdTag'); if (!t) { t = document.createElement('div'); t.id = 'tdTag'; document.body.appendChild(t); } t.textContent = 'Test drive · preview only · laps not saved'; t.classList.remove('hidden');
+}
+function endTestDrive() { if (!G.preview) return; const keep = G.preview; G.preview = null; for (const k in CFG) if (!(k in keep)) delete CFG[k]; Object.assign(CFG, keep); const t = $('tdTag'); if (t) t.classList.add('hidden'); setTimeout(() => { if (G.state === 'menu') setTab('shop'); }, 0); }
 function swatchFor(cat, c) { return cat.k === 'glow' ? `<div class="shGlow" style="--c:${c}"></div>` : cat.k === 'smoke' ? `<div class="shSmoke" style="--c:${c}"></div>` : `<div class="shSw" style="background:${c}"></div>`; }
 function shopBuild() {
   const root = $('shopRoot'); if (!root || root.dataset.built) return; root.dataset.built = '1';
-  root.innerHTML = `<div class="stage shStage"><canvas id="shPrev" width="960" height="340"></canvas><p><span id="shPrevDesc"></span> <button class="opt hidden" id="shPrevReset">Reset preview</button></p></div>
+  root.innerHTML = `<div class="stage shStage"><canvas id="shPrev" width="960" height="340"></canvas><p class="shPrevBar"><span id="shPrevDesc"></span> <button class="opt hidden" id="shPrevReset">Reset preview</button><button class="tdBtn" id="shTest">▶ Test drive</button></p><p class="shPrevTip">Drag to spin · tap any car, pattern or colour to try it on · Test drive it on track before you buy</p></div>
   <div id="coinBar" class="coinBar"></div>
   <h2 class="shH">Cars <small>Cosmetic only · every car handles the same · hover to preview</small></h2>
   <div class="shGrid">${CAR_TYPES.filter(t => SHOP.cars[t.id] !== undefined).map(t => `<div class="shCard" data-car="${t.id}"><canvas width="300" height="170"></canvas><b>${esc(t.name)}</b><span class="dim">${esc(t.desc)}</span><button class="shBtn"></button></div>`).join('')}</div>
@@ -140,8 +159,19 @@ function shopBuild() {
   <div class="shColGrid">${CATS.map(c => `<div class="shCard shCol" data-cat="${c.k}"><div class="shColHead"><b>${c.name}</b><small>${c.cost.toLocaleString()} each · ${c.allCost.toLocaleString()} all</small></div><span class="dim">${c.sub}</span><div class="shColSw">${swatchFor(c, c.def)}</div><div class="row"><input type="color" value="${c.def}" title="Colour picker"><input class="hex" maxlength="7" spellcheck="false" value="${c.def.toUpperCase()}" title="Hex code, e.g. #FF2A2A"></div><button class="shBtn one"></button><button class="shBtn all"></button></div>`).join('')}</div>
   <h2 class="shH">Secondary patterns <small>${SHOP.patCost} coins each · painted in your secondary colours · hover to preview</small></h2>
   <div class="shGrid sm">${LIVERIES.map(l => `<div class="shCard" data-pat="${l.id}"><canvas width="220" height="124"></canvas><b>${esc(l.name)}</b><button class="shBtn"></button></div>`).join('')}</div>`;
-  $('shPrevReset').onclick = () => { for (const k in PREV) delete PREV[k]; shopPrevDraw(); };
-  const hover = (el, k, v) => { el.onmouseenter = () => { el._old = PREV[k]; PREV[k] = v; shopPrevDraw(); }; el.onmouseleave = () => { if (el._old === undefined) delete PREV[k]; else PREV[k] = el._old; shopPrevDraw(); }; };
+  $('shPrevReset').onclick = () => { for (const k in PREV) delete PREV[k]; root.querySelectorAll('.pin').forEach(x => { x._pin = false; }); shopPrevDraw(); };
+  $('shTest').onclick = testDrive;
+  { const cv = $('shPrev'); let lx = 0;
+    cv.onpointerdown = e => { SPIN.drag = true; lx = e.clientX; cv.classList.add('drag'); cv.setPointerCapture(e.pointerId); };
+    cv.onpointermove = e => { if (!SPIN.drag) return; SPIN.a += (e.clientX - lx) * 0.012; lx = e.clientX; };
+    cv.onpointerup = cv.onpointercancel = () => { SPIN.drag = null; SPIN.idle = performance.now() + 2500; cv.classList.remove('drag'); }; }
+  // hover = quick peek, click/tap = keep it on the preview until you pick something else or reset
+  const hover = (el, k, v) => {
+    el.onmouseenter = () => { el._old = PREV[k]; PREV[k] = v; shopPrevDraw(); };
+    el.onmouseleave = () => { if (el._pin) return; if (el._old === undefined) delete PREV[k]; else PREV[k] = el._old; shopPrevDraw(); };
+    el.addEventListener('click', e => { if (e.target.closest('.shBtn')) return; root.querySelectorAll(k === 'body' ? '[data-car]' : '[data-pat]').forEach(x => { x._pin = false; });
+      el._pin = true; el._old = v; PREV[k] = v; shopPrevDraw(); if (window.scrollY > 200) $('shPrev').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  };
   root.querySelectorAll('[data-car]').forEach(d => {
     hover(d, 'body', d.dataset.car);
     d.querySelector('.shBtn').onclick = () => {
