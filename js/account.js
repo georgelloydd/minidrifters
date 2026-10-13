@@ -218,7 +218,10 @@ const LB = {
       const r = await lapsGet(`laps?track=eq.${tr}&select=pid,name,color,body,lap_ms,score,created_at&order=lap_ms.asc&limit=100`);
       const seen = new Set(), rows = []; for (const x of r) { if (seen.has(x.pid)) continue; seen.add(x.pid); rows.push({ pid: x.pid, name: x.name, color: x.color, body: x.body, look: x.look || null, lap: x.lap_ms, score: x.score, at: Date.parse(x.created_at) }); }
       const mine = Math.round(ACCT.bestLap(tr)), P = this.pend(), srv = rows.find(x => x.pid === ACCT.pub);
-      if (ACCT.reg && mine && !TRACKS[tr].test && (!srv || mine < srv.lap) && (r.length < 100 || mine <= r[r.length - 1].lap_ms)) {
+      // already uploaded once and now missing (or slower) on the server = the developer deleted it: don't send it back
+      let sy = null; try { sy = JSON.parse(localStorage.getItem('md_synced_' + ACCT.key) || '{}')[tr]; } catch (e) { }
+      const gone = !!sy && Math.abs(sy - mine) <= 1 && !P[tr];
+      if (ACCT.reg && mine && !gone && !TRACKS[tr].test && (!srv || mine < srv.lap) && (r.length < 100 || mine <= r[r.length - 1].lap_ms)) {
         const rj = this.rej()[tr], bad = rj && rj.lap === mine;
         if (!P[tr] && !bad) { const q = { pid: ACCT.pub, lap: mine, score: 0 }, rp = localRepFor(tr, mine); if (rp) q.rep = rp; this.queue(tr, q); }
         const me = { pid: ACCT.pub, name: CFG.name, color: CFG.color, body: CFG.body, lap: mine, at: Date.now(), pending: !bad, failed: bad ? rj.why : '' };
