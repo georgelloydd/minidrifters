@@ -115,7 +115,16 @@ const ACCT = {
   },
   lap(tr, ms, score, rep) { const b = this.stats.best[tr] = this.stats.best[tr] || {}; let pb = false; if (!b.lap || ms < b.lap) { b.lap = ms; pb = true; }
     let sy = null; try { sy = JSON.parse(localStorage.getItem('md_synced_' + this.key) || '{}')[tr]; } catch (e) { }
-    if (pb || (this.reg && (!sy || ms < sy))) LB.submit(tr, ms, score, rep); this.save(); return pb; },
+    if (pb || (this.reg && (!sy || ms < sy))) LB.submit(tr, ms, score, rep);
+    else if (CLOUD && this.reg && sy && !LB.pend()[tr]) this.serverLap(tr).then(v => { if (v === 0 || (v && v > b.lap + 1)) { this.forget(tr); this.lap(tr, ms, score, rep); } }).catch(() => { });
+    this.save(); return pb; },
+  // this player's time on the server for a track (0 = none, null = could not check)
+  async serverLap(tr) { try { const r = await sb('GET', 'laps?track=eq.' + (+tr) + '&pid=eq.' + this.pub + '&select=lap_ms&limit=1'); return r && r[0] ? +r[0].lap_ms : 0; } catch (e) { return null; } },
+  // the developer deleted our time on a track: drop the old best here so the next lap goes up
+  forget(tr) { delete this.stats.best[tr];
+    try { const d = JSON.parse(localStorage.getItem('md_synced_' + this.key) || '{}'); delete d[tr]; localStorage.setItem('md_synced_' + this.key, JSON.stringify(d)); } catch (e) { }
+    try { localStorage.setItem('md_lb_' + tr, JSON.stringify(LB.localGet(tr).filter(x => x.pid !== this.pub))); } catch (e) { }
+    this.save(); },
 };
 
 let ONLINE_ERR = '';
@@ -220,7 +229,8 @@ const LB = {
       const mine = Math.round(ACCT.bestLap(tr)), P = this.pend(), srv = rows.find(x => x.pid === ACCT.pub);
       // already uploaded once and now missing (or slower) on the server = the developer deleted it: don't send it back
       let sy = null; try { sy = JSON.parse(localStorage.getItem('md_synced_' + ACCT.key) || '{}')[tr]; } catch (e) { }
-      const gone = !!sy && Math.abs(sy - mine) <= 1 && !P[tr];
+      const gone = ACCT.reg && !!sy && !!mine && Math.abs(sy - mine) <= 1 && !P[tr] && (!srv || srv.lap > mine + 1);
+      if (gone) ACCT.forget(tr);
       if (ACCT.reg && mine && !gone && !TRACKS[tr].test && (!srv || mine < srv.lap) && (r.length < 100 || mine <= r[r.length - 1].lap_ms)) {
         const rj = this.rej()[tr], bad = rj && rj.lap === mine;
         if (!P[tr] && !bad) { const q = { pid: ACCT.pub, lap: mine, score: 0 }, rp = localRepFor(tr, mine); if (rp) q.rep = rp; this.queue(tr, q); }
