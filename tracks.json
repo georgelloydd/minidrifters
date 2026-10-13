@@ -1729,13 +1729,8 @@
      ]
     ]
    ],
-   "stand": {
-    "p": [
-     0.7462,
-     0.419
-    ],
-    "a": -1.983
-   }
+   "stand": false,
+   "hidden": true
   },
   {
    "name": "Intercity Istanbul Park",
