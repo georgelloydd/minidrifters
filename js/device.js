@@ -15,7 +15,7 @@
     if (typeof CLOUD === 'undefined' || !CLOUD || typeof ACCT === 'undefined' || !ACCT.pub) return;
     const dev = devId(), key = dev + '|' + ACCT.pub, now = Date.now();
     if (key === last && now - lastT < 30 * 60000) return;
-    try { await sb('POST', 'rpc/report_device', { p_dev: dev, p_pid: ACCT.pub }); last = key; lastT = now; } catch (e) { }
+    try { await sb('POST', 'rpc/report_device', { p_dev: dev, p_pid: ACCT.pub }); last = key; lastT = now; } catch (e) { console.warn('[device] could not report this browser:', e.message); }
   }
-  devId(); setTimeout(report, 2500); setInterval(report, 8000);
+  devId(); setTimeout(report, 1200); setInterval(report, 4000);
 })();
