@@ -21,6 +21,9 @@ W/↑ throttle · S/↓ brake · A D/← → steer · SPACE handbrake · R reset
 ## Rocket launcher
 Granted per player from the dev site (Troll tab → 🚀 Rocket launcher). Press **X** (rebindable in Settings) to fire. A car that is hit explodes, shows a death screen, then respawns at its last checkpoint with 2 s of protection.
 
+## Banning
+Players tab on the dev site → **Ban**. The banned account's browser shows a banned screen (a flag is kept in localStorage so signing out or playing as a guest doesn't get round it) until you press **Unban**.
+
 ## Garage
 8 car types (Street, Drift SR, GT, Formula, Hot Hatch, Muscle, Rally, Kei Truck), 7 liveries and 10 colours. They're cosmetic only: every car handles the same. Friends in your room see your design.
 
