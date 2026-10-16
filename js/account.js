@@ -229,7 +229,7 @@ const LB = {
       const mine = Math.round(ACCT.bestLap(tr)), P = this.pend(), srv = rows.find(x => x.pid === ACCT.pub);
       // already uploaded once and now missing (or slower) on the server = the developer deleted it: don't send it back
       let sy = null; try { sy = JSON.parse(localStorage.getItem('md_synced_' + ACCT.key) || '{}')[tr]; } catch (e) { }
-      const gone = ACCT.reg && !!sy && !!mine && Math.abs(sy - mine) <= 1 && !P[tr] && (!srv || srv.lap > mine + 1);
+      const gone = ACCT.reg && !!sy && !!mine && Math.abs(sy - mine) <= 1 && !P[tr] && (srv ? srv.lap > mine + 1 : r.length < 100);
       if (gone) ACCT.forget(tr);
       if (ACCT.reg && mine && !gone && !TRACKS[tr].test && (!srv || mine < srv.lap) && (r.length < 100 || mine <= r[r.length - 1].lap_ms)) {
         const rj = this.rej()[tr], bad = rj && rj.lap === mine;
@@ -245,7 +245,7 @@ const LB = {
 async function loadTweaks() {
   if (!CLOUD || !ACCT.pub) return;
   try { const r = await sb('GET', 'player_tweaks?pid=eq.' + ACCT.pub + '&select=data'), d = (r && r[0] && r[0].data) || {}, t = Object.assign({}, TW_DEF);
-    for (const k in TW_DEF) { const v = d[k]; if (typeof v === 'number' && isFinite(v)) t[k] = k === 'inv' ? (v ? 1 : 0) : Math.max(k === 'maxs' || k === 'engine' ? 0.01 : 0, Math.min(1000, v)); }
+    for (const k in TW_DEF) { const v = d[k]; if (typeof v === 'number' && isFinite(v)) t[k] = k === 'inv' || k === 'rl' ? (v ? 1 : 0) : Math.max(k === 'maxs' || k === 'engine' ? 0.01 : 0, Math.min(1000, v)); }
     TWEAKS = t; if (G.me) G.me.tw = TWEAKS; } catch (e) { }
 }
 setInterval(loadTweaks, 15000);

@@ -185,8 +185,9 @@ addEventListener('keydown', e => {
   KEYS[k] = true;
   if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k) || (k === B.hb && G.state !== 'menu')) e.preventDefault();
   if (G.state === 'race' && G.me) {
-    if (k === B.reset && !e.repeat) { if (G.tt) ttRestart(); else resetCar(G.me); }
-    if (k === B.cp && !e.repeat) { if (G.tt) ttCheckpoint(); else raceCheckpoint(); }
+    if (k === B.reset && !e.repeat && !G.me.dead) { if (G.tt) ttRestart(); else resetCar(G.me); }
+    if (k === B.cp && !e.repeat && !G.me.dead) { if (G.tt) ttCheckpoint(); else raceCheckpoint(); }
+    if (k === B.rocket && !e.repeat) rocketFire();
   }
   if (k === B.cam && !e.repeat) { G.rot = !G.rot; pop(G.rot ? 'Chase camera' : 'Top-down camera'); }
   if (k === B.mute && !e.repeat) pop(sndMute() ? 'Sound off' : 'Sound on');
@@ -199,7 +200,7 @@ Promise.all([ACCT.load().catch(e => console.warn(e)), loadTracks()]).then(() => 
 
 // ===== Settings: keybinds + graphics =====
 let BINDING = null;
-const BIND_ACTIONS = [['up', 'Throttle'], ['down', 'Brake / reverse'], ['left', 'Steer left'], ['right', 'Steer right'], ['hb', 'Handbrake'], ['reset', 'Reset (time trial: restart lap)'], ['cp', 'Back to last checkpoint'], ['cam', 'Switch camera'], ['mute', 'Mute sound']];
+const BIND_ACTIONS = [['up', 'Throttle'], ['down', 'Brake / reverse'], ['left', 'Steer left'], ['right', 'Steer right'], ['hb', 'Handbrake'], ['reset', 'Reset (time trial: restart lap)'], ['cp', 'Back to last checkpoint'], ['cam', 'Switch camera'], ['mute', 'Mute sound'], ['rocket', 'Fire rocket launcher (if you have one)']];
 function keyName(k) { if (!k) return '?'; if (k === ' ') return 'SPACE'; const A = { arrowup: '↑', arrowdown: '↓', arrowleft: '←', arrowright: '→' }; return A[k] || k.toUpperCase(); }
 function setBind(a, k) { for (const x in CFG.keys) if (x !== a && CFG.keys[x] === k) CFG.keys[x] = CFG.keys[a]; CFG.keys[a] = k; saveCfg(); keysHint(); }
 function renderBinds() {

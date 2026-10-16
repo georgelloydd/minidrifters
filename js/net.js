@@ -52,6 +52,7 @@ function hostData(c, d) {
   } else if (!NET.players.has(c.peer)) return;
   else if (d.t === 'st') { const p = NET.players.get(c.peer); p.s = d.s; emit('st', { id: c.peer, s: d.s }); }
   else if (d.t === 'fin') { emit('fin', { id: c.peer, time: d.time, score: d.score, laps: d.laps, rid: d.rid }); }
+  else if (d.t === 'rk' || d.t === 'boom') { d.from = c.peer; netSend(d); emit(d.t, d); }
   else if (d.t === 'info') { const p = NET.players.get(c.peer); p.name = String(d.name || p.name).slice(0, 14); netLobby(); }
 }
 // host left: the next player to have joined takes over the room (same code), everyone else reconnects to them

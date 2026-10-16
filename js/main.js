@@ -7,7 +7,7 @@ addEventListener('resize', resize); resize();
 const COLORS = ['#ff3b3b', '#ff8c1a', '#ffd60a', '#2ecc71', '#1ec8ff', '#3d6bff', '#a24dff', '#ff3fb4', '#f2f2f2', '#33363d'];
 const CFG = Object.assign({ name: 'Driver', color: COLORS[Math.floor(Math.random() * 8)], track: 0, mode: 'tt', laps: 3, body: 'drift', livery: 'stripes', accent: '#ffffff', accent2: '#111111', rim: '#c9ccd2', finish: 'gloss', num: '7' }, JSON.parse(localStorage.getItem('md_cfg') || '{}'));
 function saveCfg() { localStorage.setItem('md_cfg', JSON.stringify(CFG)); if (typeof ACCT !== 'undefined') ACCT.save(); }
-const DEF_KEYS = { up: 'w', down: 's', left: 'a', right: 'd', hb: ' ', reset: 'r', cp: 'f', cam: 'c', mute: 'm' };
+const DEF_KEYS = { up: 'w', down: 's', left: 'a', right: 'd', hb: ' ', reset: 'r', cp: 'f', cam: 'c', mute: 'm', rocket: 'x' };
 const DEF_GFX = { res: 'sharp', smoke: 1, skids: 1, weather: 1, vignette: 1, gates: 1, fps: 0 };
 CFG.keys = Object.assign({}, DEF_KEYS, CFG.keys || {}); CFG.gfx = Object.assign({}, DEF_GFX, CFG.gfx || {});
 const GFX_SCALES = { sharp: 2, balanced: 1.5, fast: 1, retro: 0.6 };
@@ -28,7 +28,7 @@ function startSession(cfg, grid, mp, rid) {
   if (SESS.blocked) return;
   if (cfg.mode === 'tt') { cfg = Object.assign({}, cfg, { laps: 0 }); mp = false; grid = null; }
   G.tt = cfg.mode === 'tt' ? { laps: 0, restarts: 0, cps: 0, start: 0 } : null; G.dist = 0; G.wx = cfg.mode === 'tt' ? 'auto' : (cfg.wx || 'auto'); G.rain = [];
-  G.cfg = cfg; G.mp = mp; G.tr = buildTrack(cfg.track); G.rem.clear(); G.res.clear(); G.resList = null; G.final = false; G.firstFin = 0; G.smoke = []; G.flag = false; G.rid = rid || 0; for (const k in KEYS) KEYS[k] = false;
+  G.cfg = cfg; G.mp = mp; G.tr = buildTrack(cfg.track); G.rem.clear(); G.res.clear(); G.resList = null; G.final = false; G.firstFin = 0; G.smoke = []; G.flag = false; G.rid = rid || 0; for (const k in KEYS) KEYS[k] = false; if (typeof rkReset === 'function') rkReset();
   grid = grid || [myId()];
   grid.forEach((id, slot) => {
     if (id === myId()) { G.me = newCar(slot, G.tr, id, CFG.name, CFG.color); Object.assign(G.me, carLook(CFG)); G.me.cpI = null; G.me.tw = TWEAKS; if (G.wx === 'rain' || G.wx === 'storm') G.me.tw = Object.assign({}, TWEAKS || {}, { grip: ((TWEAKS && TWEAKS.grip) || 1) * 0.86 }); }
@@ -114,7 +114,7 @@ function tickInner(ts, bg) {
   if (G.state === 'countdown') { const left = G.cdEnd - now; banner(left > 0 ? (G.cfg.laps ? String(Math.ceil(left / 1000)) : '') : ''); if (left <= 0) { G.state = 'race'; if (G.tt) G.tt.start = now; if (G.cfg.laps) { banner('GO!'); setTimeout(() => { if ($('banner').textContent === 'GO!') banner(''); }, 900); } } }
   G.acc += dt; let inp = inputs();
   if (!racing) inp = { hb: true }; else if (me.finished) inp = { down: me.vF > 30 };
-  while (G.acc >= STEP) { G.acc -= STEP; me.px = me.x; me.py = me.y; me.pa = me.a; const ox = me.x, oy = me.y, nr = stepCar(me, inp, STEP, G.tr); if (racing && !me.finished) { const tn = now - G.acc * 1000; gateCross(me, ox, oy, tn); progress(me, nr.i, tn); if (me.lap >= 0) recSample(me, ox, oy, me.pa, tn); } }
+  while (G.acc >= STEP) { G.acc -= STEP; if (me.dead) { me.vx = me.vy = 0; me.speed = 0; continue; } me.px = me.x; me.py = me.y; me.pa = me.a; const ox = me.x, oy = me.y, nr = stepCar(me, inp, STEP, G.tr); if (racing && !me.finished) { const tn = now - G.acc * 1000; gateCross(me, ox, oy, tn); progress(me, nr.i, tn); if (me.lap >= 0) recSample(me, ox, oy, me.pa, tn); } }
   // drift scoring
   if (racing && !me.finished) {
     G.dist += me.speed * dt;
@@ -124,7 +124,8 @@ function tickInner(ts, bg) {
   }
   // remote cars
   for (const [id, r] of G.rem) { if (!r.tgt) continue; const c = r.car; interpRemote(r, c, now);
-    const dx = me.x - c.x, dy = me.y - c.y, dd = Math.hypot(dx, dy); if (dd < 44 && dd > 0.01 && racing && !c.finished && !me.finished) { const nx = dx / dd, ny = dy / dd; me.x += nx * (44 - dd); me.y += ny * (44 - dd); const rv = (me.vx - c.vx) * nx + (me.vy - c.vy) * ny; if (rv < 0) { me.vx -= rv * 1.3 * nx; me.vy -= rv * 1.3 * ny; } if (me.cur > 200) { pop('CONTACT! DRIFT LOST', '#ff6060'); me.cur = 0; me.combo = 1; } } }
+    const dx = me.x - c.x, dy = me.y - c.y, dd = Math.hypot(dx, dy); if (dd < 44 && dd > 0.01 && racing && !c.finished && !me.finished && !me.dead && !(c.deadUntil > now)) { const nx = dx / dd, ny = dy / dd; me.x += nx * (44 - dd); me.y += ny * (44 - dd); const rv = (me.vx - c.vx) * nx + (me.vy - c.vy) * ny; if (rv < 0) { me.vx -= rv * 1.3 * nx; me.vy -= rv * 1.3 * ny; } if (me.cur > 200) { pop('CONTACT! DRIFT LOST', '#ff6060'); me.cur = 0; me.combo = 1; } } }
+  if (typeof rocketTick === 'function') rocketTick(Math.min(dt, 0.05), now);
   // network
   if (G.mp && now - G.sendT > NET.rate) { G.sendT = now; const s = pack(me); if (NET.host) { const list = [['host', ...s]]; for (const [id, r] of G.rem) if (r.raw) list.push([id, ...r.raw]); netSend({ t: 'all', list }); if (G.firstFin && !G.final && now - G.firstFin > 120000) hostRes(true); } else netSend({ t: 'st', s }); }
   if (bg) { sndUpdate(me, true); return; }

@@ -1,7 +1,7 @@
 // ===== Car physics + drawing =====
 const CAR = { MAXS: 980, ENGINE: 1050, BRAKE: 1600, REV: 520, STEER: 2.9, L: 58, W: 28 };
 // handling multipliers the admin can set per player from the dev site's Troll tab
-const TW_DEF = { maxs: 1, engine: 1, brake: 1, rev: 1, steer: 1, grip: 1, drift: 1, dmom: 1, hb: 1, off: 1, inv: 0 };
+const TW_DEF = { maxs: 1, engine: 1, brake: 1, rev: 1, steer: 1, grip: 1, drift: 1, dmom: 1, hb: 1, off: 1, inv: 0, rl: 0 };
 let TWEAKS = Object.assign({}, TW_DEF);
 function shadeHex(hex, f) { let r, g, b; if (hex[0] === '#') { const n = parseInt(hex.slice(1), 16); r = n >> 16; g = (n >> 8) & 255; b = n & 255; } else[r, g, b] = hex.match(/\d+/g).map(Number); const m = v => Math.max(0, Math.min(255, Math.round(f > 1 ? v + (255 - v) * (f - 1) : v * f))); return `rgb(${m(r)},${m(g)},${m(b)})`; }
 function newCar(slot, tr, id, name, color) {

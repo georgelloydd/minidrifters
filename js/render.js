@@ -16,6 +16,7 @@ function drawWorld(tr, cam, cars, rot) {
   const dc = c => { if (c.finished && (G.state === 'race' || G.state === 'countdown' || G.state === 'over')) { drawFaded(c); } else drawCar(ctx, c, night); };
   const hi = []; for (const c of cars) { if (carLayer(tr, c) === 1) hi.push(c); else dc(c); }
   drawTunnelRoof(ctx, tr, 0.9 - 0.75 * tT); drawBridges(ctx, tr); hi.forEach(dc);
+  if (G.state !== 'menu' && G.state !== 'lobby' && typeof drawRocketFx === 'function' && (G.rk.length || G.boom.length)) drawRocketFx(ctx);
   ctx.restore();
   ctx.font = '700 13px Segoe UI, system-ui, sans-serif'; ctx.textAlign = 'center';
   for (const c of cars) { if (!c.name || c === G.me) continue; const [x, y] = worldToScreen(cam, c.x, c.y); const w = ctx.measureText(c.name).width + 14; ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.beginPath(); ctx.roundRect(x - w / 2, y - 52, w, 20, 8); ctx.fill(); ctx.fillStyle = c.color; ctx.fillRect(x - w / 2 + 4, y - 35, w - 8, 2); ctx.fillStyle = '#fff'; ctx.fillText(c.name, x, y - 37); }
@@ -32,7 +33,7 @@ function renderInner(dt, me) {
   const cam = G.cam, base = Math.min(VW, VH) / 820, zt = base * (1.08 - Math.min(1, me.speed / CAR.MAXS) * 0.32) * (1 + 0.4 * (G.tunT = (G.tunT || 0) + ((me.layer === -1 ? 1 : 0) - (G.tunT || 0)) * Math.min(1, dt * 3))), k = 1 - Math.exp(-dt * 6);
   cam.z += (zt - cam.z) * (1 - Math.exp(-dt * 2)); cam.x += (me.x + me.vx * 0.3 - cam.x) * k; cam.y += (me.y + me.vy * 0.3 - cam.y) * k;
   if (G.rot) cam.a += angDiff(-me.a - Math.PI / 2, cam.a) * (1 - Math.exp(-dt * 4));
-  drawWorld(G.tr, cam, [...ghostCars(), ...[...G.rem.values()].map(r => r.car), me], G.rot);
+  const tn = performance.now(); drawWorld(G.tr, cam, [...ghostCars(), ...[...G.rem.values()].map(r => r.car).filter(c => !(c.deadUntil > tn)), ...(me.dead ? [] : [me])], G.rot);
   drawMini();
   if (CFG.gfx.fps) { G.fps = (G.fps || 60) * 0.94 + (1 / Math.max(dt, 1e-3)) * 0.06; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.font = '700 12px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText(Math.round(G.fps) + ' FPS', 14, VH - 14); }
 }
@@ -95,7 +96,7 @@ function renderAttract(dt) {
 }
 function toMenu() {
   if (G.preview && typeof endTestDrive === 'function') endTestDrive();
-  if (G.mp) netLeave(); G.mp = false; G.state = 'menu'; G.snow = [];
+  if (G.mp) netLeave(); G.mp = false; G.state = 'menu'; G.snow = []; if (typeof rkReset === 'function') rkReset();
   for (const s of ['hud', 'speedo', 'mini', 'board', 'driftBox', 'lobby', 'hKeys']) $(s).classList.add('hidden'); $('menu').classList.remove('hidden'); banner(''); if (window.refreshMenu) refreshMenu(); sndUpdate({ speed: 0 }, false);
 }
 function hostToLobby() { NET.inRace = false; G.state = 'lobby'; netLobby(); }
