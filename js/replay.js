@@ -154,3 +154,26 @@ function rpRecord() {
 }
 document.addEventListener('keydown', e => { if (!RP.on || G.state !== 'replay') return; if (e.key === 'Escape') { e.preventDefault(); e.stopImmediatePropagation(); closeReplay(); } else if (e.key === ' ') { e.preventDefault(); e.stopImmediatePropagation(); $('rpPlay').click(); } else if (RP.multi && (e.key === 'Tab' || e.key === ']' || e.key === '[')) { e.preventDefault(); e.stopImmediatePropagation(); rpFocus(e.key === '[' || e.shiftKey ? -1 : 1); } }, true);
 document.addEventListener('click', e => { const b = e.target.closest('[data-watch]'); if (!b) return; e.stopPropagation(); watchRow(LBT, LBROWS[+b.dataset.watch], b); });
+
+// === ROCKET RENDER OVERLAY PATCH ===
+// Automatically maps rocket entities onto the HTML5 Canvas matrix layout loop
+(function patchRenderLoop() {
+  const originalRequestAnimationFrame = window.requestAnimationFrame;
+  
+  window.requestAnimationFrame = function(callback) {
+    return originalRequestAnimationFrame(function(timestamp) {
+      // Execute standard client canvas loop sequence
+      const result = callback(timestamp);
+      
+      // Inject overlay layer logic safely directly underneath current interface panels
+      if (G.state === 'race' && typeof drawRocketFx === 'function') {
+        const canvas = document.querySelector('canvas');
+        if (canvas) {
+          const ctx = canvas.getContext('2d');
+          if (ctx) drawRocketFx(ctx);
+        }
+      }
+      return result;
+    });
+  };
+})();
