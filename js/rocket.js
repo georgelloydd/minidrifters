@@ -2,7 +2,7 @@
 // Press and hold the Rocket key (X by default) to burst fire instantly when the cooldown ends.
 // Each driver's own game decides whether a rocket hit THEIR car:
 // they explode, see a death screen, then respawn at their last checkpoint. Everyone else sees the blast.
-const RK = { SPEED: 1700, LIFE: 2.2, COOL: 0.01, HIT: 34, DEAD: 3, SHIELD: 2 }; // COOL is 0.12s (120ms) for high-speed automatic burst fire
+const RK = { SPEED: 1700, LIFE: 2.2, COOL: 0.01, HIT: 34, DEAD: 2, SHIELD: 0 }; // COOL is 0.12s (120ms) for high-speed automatic burst fire
 G.rk = []; G.boom = [];
 G.rkFiring = false; // Tracking flag for held-down fire key
 
