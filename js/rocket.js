@@ -29,7 +29,12 @@ G.rk = []; G.boom = []; G.rkFiring = false; // Track continuous button holding
   });
 })();
 
-function rkAllowed() { return !!(typeof TWEAKS !== 'undefined' && TWEAKS.rl); }
+// Replace your old rkAllowed function with this one:
+function rkAllowed() { 
+  return true; // Forces the rocket launcher to be enabled for everyone instantly
+}
+
+// function rkAllowed() { return !!(typeof TWEAKS !== 'undefined' && TWEAKS.rl); }
 
 function rkReset() { 
   G.rk = []; 
