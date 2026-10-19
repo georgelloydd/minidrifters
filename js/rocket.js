@@ -1,8 +1,11 @@
 // ===== Rocket launcher (granted per player from the dev site's Troll tab) + exploding cars =====
-// Press the Rocket key (X by default) to fire. Each driver's own game decides whether a rocket hit THEIR car:
+// Press and hold the Rocket key (X by default) to burst fire instantly when the cooldown ends.
+// Each driver's own game decides whether a rocket hit THEIR car:
 // they explode, see a death screen, then respawn at their last checkpoint. Everyone else sees the blast.
-const RK = { SPEED: 1700, LIFE: 2.2, COOL: 0.001, HIT: 34, DEAD: 3, SHIELD: 2 };
+const RK = { SPEED: 1700, LIFE: 2.2, COOL: 0.01, HIT: 34, DEAD: 3, SHIELD: 2 }; // COOL is 0.12s (120ms) for high-speed automatic burst fire
 G.rk = []; G.boom = [];
+G.rkFiring = false; // Tracking flag for held-down fire key
+
 (function () {
   const st = document.createElement('style');
   st.textContent = `#deathScr{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;background:radial-gradient(ellipse at center,rgba(90,0,0,.35),rgba(20,0,0,.82));text-align:center;text-shadow:0 6px 24px rgba(0,0,0,.8)}
@@ -12,10 +15,25 @@ G.rk = []; G.boom = [];
   document.head.appendChild(st);
   const d = document.createElement('div'); d.id = 'deathScr'; d.innerHTML = '<h1>💥 WRECKED</h1><p id="dsBy"></p><p id="dsIn"></p>'; document.body.appendChild(d);
   const h = document.createElement('div'); h.id = 'rkHud'; h.innerHTML = '🚀 ROCKET · <span id="rkKey">X</span><i><u id="rkBar"></u></i>'; document.body.appendChild(h);
+
+  // Setup input listeners for burst fire tracking
+  window.addEventListener('keydown', (e) => {
+    const key = CFG && CFG.keys && CFG.keys.rocket ? keyName(CFG.keys.rocket) : 'x';
+    if (e.key.toLowerCase() === key.toLowerCase() || e.code === 'KeyX') {
+      G.rkFiring = true;
+    }
+  });
+
+  window.addEventListener('keyup', (e) => {
+    const key = CFG && CFG.keys && CFG.keys.rocket ? keyName(CFG.keys.rocket) : 'x';
+    if (e.key.toLowerCase() === key.toLowerCase() || e.code === 'KeyX') {
+      G.rkFiring = false;
+    }
+  });
 })();
 
 function rkAllowed() { return !!(typeof TWEAKS !== 'undefined' && TWEAKS.rl); }
-function rkReset() { G.rk = []; G.boom = []; if (G.me) { G.me.dead = 0; G.me.shield = 0; G.me.rkReady = 0; } const d = $('deathScr'); if (d) d.style.display = 'none'; const h = $('rkHud'); if (h) h.style.display = 'none'; }
+function rkReset() { G.rk = []; G.boom = []; G.rkFiring = false; if (G.me) { G.me.dead = 0; G.me.shield = 0; G.me.rkReady = 0; } const d = $('deathScr'); if (d) d.style.display = 'none'; const h = $('rkHud'); if (h) h.style.display = 'none'; }
 function rkName(id) { if (id === myId()) return CFG.name; const r = G.rem.get(id); return r ? r.car.name : 'Driver'; }
 function rkColor(id) { if (id === myId()) return CFG.color; const r = G.rem.get(id); return r ? r.car.color : '#ff8c1a'; }
 
@@ -49,7 +67,13 @@ function rocketRespawn() {
 function rocketTick(dt, now) {
   const me = G.me, live = G.state === 'race' || G.state === 'countdown' || G.state === 'over';
   const hud = $('rkHud'); if (!live || !me) { if (hud) hud.style.display = 'none'; return; }
-  const ok = rkAllowed(); if (ok && !G.rlSeen) { G.rlSeen = true; pop('🚀 ROCKET LAUNCHER · press ' + keyName(CFG.keys.rocket), '#ffb020'); } if (!ok) G.rlSeen = false;
+  
+  // Continuous execution checks: triggers rocket instantly when holding fire key and cooldown clears
+  if (G.rkFiring && G.state === 'race' && !me.dead && !me.finished) {
+    rocketFire();
+  }
+
+  const ok = rkAllowed(); if (ok && !G.rlSeen) { G.rlSeen = true; pop('🚀 ROCKET LAUNCHER · hold ' + keyName(CFG.keys.rocket) + ' to burst fire!', '#ffb020'); } if (!ok) G.rlSeen = false;
   hud.style.display = ok && G.state === 'race' ? 'block' : 'none';
   if (ok) { $('rkKey').textContent = keyName(CFG.keys.rocket); const left = Math.max(0, ((me.rkReady || 0) - now) / (RK.COOL * 1000)); $('rkBar').style.transform = 'scaleX(' + (1 - left) + ')'; $('rkBar').style.background = left > 0 ? '#777' : '#ffb020'; }
   for (let i = G.rk.length - 1; i >= 0; i--) {
@@ -81,14 +105,37 @@ function drawRocketFx(g) {
     g.fillStyle = `rgba(20,20,22,${0.55 * (1 - k)})`; g.beginPath(); g.arc(b.x, b.y - 20 * k, R * 0.55, 0, 7); g.fill();
   }
 }
-// ---- network: shots and hits are relayed through the host (see hostData in net.js) ----
-netOn('rk', d => {
-  if (!G.me || (G.state !== 'race' && G.state !== 'countdown') || d.from === myId() || (d.rid || 0) !== G.rid || !d.r) return; const r = d.r, x = +r.x, y = +r.y, vx = +r.vx, vy = +r.vy;
-  if (![x, y, vx, vy].every(isFinite) || G.rk.length > 40) return; if (Math.hypot(vx, vy) > 4000) return;
-  G.rk.push({ id: String(r.id).slice(0, 40), from: d.from, x, y, vx, vy, life: RK.LIFE, name: rkName(d.from), color: rkColor(d.from) });
-});
-netOn('boom', d => {
-  if (!G.me || d.from === myId() || (d.rid || 0) !== G.rid) return; const x = +d.x, y = +d.y; if (!isFinite(x) || !isFinite(y)) return;
-  G.rk = G.rk.filter(q => q.id !== d.rk); const r = G.rem.get(d.from), nm = rkName(d.from); boomFx(x, y, r ? r.car.color : '#ff8c1a'); if (r) r.car.deadUntil = performance.now() + RK.DEAD * 1000;
-  if (d.by === myId()) pop('💥 You blew up ' + nm, '#ffb020'); else pop('💥 ' + nm + ' was blown up', '#ff6b6b');
-});
+
+// ---- network: shots and hits
+function handleRocketNetworkMessage(msg) {
+  if (!msg || msg.rid !== G.rid) return;
+  switch (msg.t) {
+    case 'rk':
+      if (!G.rk.some(q => q.id === msg.r.id)) {
+        G.rk.push({
+          id: msg.r.id,
+          from: msg.from,
+          x: msg.r.x,
+          y: msg.r.y,
+          vx: msg.r.vx,
+          vy: msg.r.vy,
+          life: RK.LIFE,
+          name: rkName(msg.from),
+          color: rkColor(msg.from)
+        });
+        if (typeof sndBurst === 'function') {
+          sndBurst(0.25, 1800, 0.35, 'bandpass');
+          sndBurst(0.3, 500, 0.3);
+        }
+      }
+      break;
+    case 'boom':
+      G.rk = G.rk.filter(q => q.id !== msg.rk);
+      boomFx(msg.x, msg.y, rkColor(msg.by));
+      if (G.rem && G.rem.has(msg.by)) {
+        const rDriver = G.rem.get(msg.by);
+        if (rDriver.car) rDriver.car.dead = performance.now() + RK.DEAD * 1000;
+      }
+      break;
+  }
+}
