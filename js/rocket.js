@@ -1,7 +1,7 @@
 // ===== Rocket launcher (granted per player from the dev site's Troll tab) + exploding cars =====
 // Press the Rocket key (X by default) to fire. Each driver's own game decides whether a rocket hit THEIR car:
 // they explode, see a death screen, then respawn at their last checkpoint. Everyone else sees the blast.
-const RK = { SPEED: 1700, LIFE: 2.2, COOL: 1.6, HIT: 34, DEAD: 3, SHIELD: 2 };
+const RK = { SPEED: 1700, LIFE: 2.2, COOL: 0.001, HIT: 34, DEAD: 3, SHIELD: 2 };
 G.rk = []; G.boom = [];
 (function () {
   const st = document.createElement('style');
