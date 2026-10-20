@@ -164,23 +164,6 @@ class WsPeer extends Emitter {
 // Open rooms list from the game server (polled while the Multiplayer tab is open)
 let SRVPOLL = null;
 async function srvPoll(now) {
-
-// === ROCKET MULTIPLAYER HANDLER PATCH ===
-// Intercepts socket packages globally to route rocket entities across clients
-(function patchNetworkLoop() {
-  const originalNetSend = window.netSend;
-  
-  // Custom router attached safely inside the environment loop
-  window.handleIncomingWeaponPacket = function(msg) {
-    if (!msg || msg.rid !== G.rid) return;
-    if (msg.t === 'rk' || msg.t === 'boom') {
-      if (typeof handleRocketNetworkMessage === 'function') {
-        handleRocketNetworkMessage(msg);
-      }
-    }
-  };
-})();
-
   if (now) { clearInterval(SRVPOLL); SRVPOLL = setInterval(() => srvPoll(), 3000); }
   const tab = document.getElementById('tab-mp'); if (!now && (document.hidden || (tab && tab.classList.contains('hidden')) || (typeof G !== 'undefined' && G.state !== 'menu' && G.state !== 'lobby'))) return;
   try { const ac = new AbortController(), t = setTimeout(() => ac.abort(), now ? 75000 : 8000); const r = await fetch(srvHttp() + '/rooms', { signal: ac.signal, cache: 'no-store' }); clearTimeout(t);

@@ -101,7 +101,7 @@ function applyState(id, s) {
   r.tgt = { x: s[0], y: s[1], a: s[2], vx: s[3], vy: s[4], t: now }; bufState(r, s, now); c.steer = s[5]; c.drift = !!(s[6] & 1); c.brake = !!(s[6] & 2); c.hb = !!(s[6] & 4); c.lap = s[7]; c.prog = s[8]; c.score = s[9]; c.finished = s[10];
 }
 function resetCar(c) { const nr = nearestFull(G.tr, c.x, c.y), p = G.tr.pts[nr.i]; c.x = p[0]; c.y = p[1]; c.a = G.tr.dirs[nr.i]; c.vx = c.vy = 0; c.hint = nr.i; c.cur = 0; c.drift = false; }
-function inputs() { const k = KEYS, B = CFG.keys, T = typeof TOUCH !== 'undefined' ? TOUCH : {}; return { up: k[B.up] || k.arrowup || !!T.up, down: k[B.down] || k.arrowdown || !!T.down, left: k[B.left] || k.arrowleft || !!T.left, right: k[B.right] || k.arrowright || !!T.right, hb: k[B.hb] || !!T.hb }; }
+function inputs() { const k = KEYS, B = CFG.keys, T = typeof TOUCH !== 'undefined' ? TOUCH : {}; const o = { up: k[B.up] || k.arrowup || !!T.up, down: k[B.down] || k.arrowdown || !!T.down, left: k[B.left] || k.arrowleft || !!T.left, right: k[B.right] || k.arrowright || !!T.right, hb: k[B.hb] || !!T.hb }; return typeof rcMerge === 'function' ? rcMerge(o) : o; }
 
 const STEP = 1 / 120;
 function tick(ts, bg) { try { tickInner(ts, bg); } catch (e) { reportErr(e); if (!bg) requestAnimationFrame(tick); } }
