@@ -22,7 +22,7 @@ W/↑ throttle · S/↓ brake · A D/← → steer · SPACE handbrake · R reset
 Granted per player from the dev site (Troll tab → 🚀 Rocket launcher). Press **X** (rebindable in Settings) to fire. A car that is hit explodes, shows a death screen, then respawns at its last checkpoint with 2 s of protection.
 
 ## Troll extras
-Troll tab: pick several players (type to search), then tick any of: **No rocket cooldown**, **Rocket auto-fire** (hold X, about 100 rockets a second), **Allow remote control** (you drive along with them; your keys are added to theirs).
+Troll tab: pick several players (type to search), then tick any of: **No rocket cooldown**, **Rocket auto-fire** (hold X, about 100 rockets a second), **Allow remote control** (you drive along with them in a new tab that shows their live game screen; your keys are added to theirs).
 
 ## Banning
 Players tab on the dev site → **Ban**. The banned account's browser shows a banned screen (a flag is kept in localStorage so signing out or playing as a guest doesn't get round it) until you press **Unban**.
