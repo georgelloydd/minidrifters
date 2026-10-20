@@ -18,10 +18,13 @@ button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#1b1b
 .drift{position:absolute;left:50%;top:14%;transform:translateX(-50%);font-weight:900;font-style:italic;font-size:26px;color:#ffd400;text-shadow:0 2px 6px #000;display:none}
 .mini{position:absolute;left:10px;bottom:10px;width:176px;height:128px;background:rgba(10,10,12,.6);border:1px solid var(--line);border-radius:6px}
 .st{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;text-align:center;color:#c9c9d2;font-size:18px;pointer-events:none;padding:20px;background:rgba(6,6,8,.72)}.st.hide{display:none}.st small{color:#8a8a94;font-size:13px}
+.keys{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:none;gap:4px}.keys span{min-width:34px;height:30px;padding:0 6px;border:1px solid var(--line);border-radius:5px;background:rgba(10,10,12,.8);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;color:#888}.keys span.on{background:var(--red);border-color:var(--red);color:#fff}
+body.drive .keys{display:flex}.tile.nodrive .keys{display:none}#off{display:none;color:#ffb02e;font-weight:800}
 .cd{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:110px;font-weight:900;font-style:italic;color:#fff;text-shadow:0 4px 20px #000;pointer-events:none}
 #msg{padding:30px;color:#ff6b6b}
 </style></head><body>
-<div id="bar"><b>👁 SPECTATE</b><span id="hint">View only: nothing you do here reaches their game · click a screen to enlarge · 1-9 pick · R rotate camera · O whole track · mouse wheel zoom · F fullscreen</span>
+<div id="bar"><b id="ttl">👁 SPECTATE</b><span id="off">HANDS OFF (Esc)</span><span id="hint">View only: nothing you do here reaches their game · click a screen to enlarge · 1-9 pick · R rotate camera · O whole track · wheel zoom · F fullscreen</span>
+<label id="allL" style="display:none;gap:5px;align-items:center;font-weight:700"><input type="checkbox" id="all"> Drive all at once</label>
 <button id="rot" title="R">Rotate cam</button><button id="ov" title="O">Whole track</button><button id="fs">Fullscreen</button></div>
 <div id="grid"></div>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -36,6 +39,9 @@ const $ = id => document.getElementById(id), vid = 'w' + Math.random().toString(
 let LIST = []; try { LIST = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(location.hash.slice(1)))))); } catch (e) { }
 const SB = window.SPECTATE_CLIENT || (() => { try { return supabase.createClient(ONLINE.SUPABASE_URL.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, ''), ONLINE.SUPABASE_ANON_KEY.trim(), { auth: { persistSession: false, autoRefreshToken: false }, realtime: { params: { eventsPerSecond: 20 } } }); } catch (e) { return null; } })();
 if (!LIST.length || !SB) { document.body.innerHTML = '<div id="msg">Open this page with the Spectate button on the dev site\'s Troll tab.</div>'; throw new Error('no config'); }
+const DRIVE = new URLSearchParams(location.search).has('drive');
+if (DRIVE) { document.body.classList.add('drive'); document.title = 'Mini Drifters \u00b7 Drive'; $('ttl').textContent = '\ud83c\udfae DRIVE'; $('allL').style.display = 'flex';
+  $('hint').textContent = 'Arrows / WASD steer, Space handbrake. Your keys are added to theirs. Click a screen or 1-9 to pick who you drive \u00b7 Esc hands off \u00b7 R rotate cam \u00b7 O whole track \u00b7 F fullscreen'; }
 const TRK = new Map(); // track key -> built track (shared between screens)
 const DELAY = 230; // ms behind live, so movement is smooth between updates
 const VIEW = { rot: false, ov: false, zoom: 1, big: -1 };
@@ -46,10 +52,12 @@ const grid = $('grid'), cols = Math.ceil(Math.sqrt(LIST.length)); grid.style.gri
 
 const T = LIST.map((p, i) => {
   const el = document.createElement('div'); el.className = 'tile';
-  el.innerHTML = '<canvas class="view"></canvas><div class="drift"></div><div class="cd"></div><canvas class="mini" width="352" height="256"></canvas><div class="spd">0<small>km/h</small></div><div class="hud"></div><div class="tag"><span class="dot"></span><span class="nm"></span><span class="state"></span></div><div class="st">Connecting…</div>';
+  el.innerHTML = '<canvas class="view"></canvas><div class="drift"></div><div class="cd"></div><div class="keys"><span data-k="l">←</span><span data-k="u">↑</span><span data-k="d">↓</span><span data-k="r">→</span><span data-k="h">SPACE</span></div><canvas class="mini" width="352" height="256"></canvas><div class="spd">0<small>km/h</small></div><div class="hud"></div><div class="tag"><span class="dot"></span><span class="nm"></span><span class="state"></span></div><div class="st">Connecting…</div>';
   grid.appendChild(el); el.querySelector('.nm').textContent = (LIST.length > 1 ? (i + 1) + ' · ' : '') + p.name;
-  el.onclick = () => setBig(VIEW.big === i ? -1 : i);
+  if (DRIVE && !p.rc) el.classList.add('nodrive');
+  el.onclick = () => { if (DRIVE) { if (FOCUS !== i) { setFocus(i); if (VIEW.big >= 0) setBig(i); return; } } setBig(VIEW.big === i ? -1 : i); };
   const t = { p, i, el, cv: el.querySelector('canvas.view'), mini: el.querySelector('canvas.mini'), st: el.querySelector('.st'), dot: el.querySelector('.dot'), state: el.querySelector('.state'), hud: el.querySelector('.hud'), spd: el.querySelector('.spd'), drift: el.querySelector('.drift'), cd: el.querySelector('.cd'),
+    ks: { l: 0, r: 0, u: 0, d: 0, h: 0 }, sentZero: true, keyEls: [...el.querySelectorAll('.keys span')],
     ch: null, sub: false, here: false, last: null, lastAt: 0, key: '', tr: null, buf: new Map(), look: new Map(), cam: { x: 0, y: 0, z: 0.5, a: 0 }, smoke: [], skid: [], subAt: 0, joinedAt: 0, miniKey: '', miniC: null };
   t.cv.addEventListener('wheel', e => { e.preventDefault(); VIEW.zoom = Math.max(0.3, Math.min(3, VIEW.zoom * (e.deltaY > 0 ? 0.9 : 1.1))); }, { passive: false });
   join(t); return t;
@@ -97,7 +105,7 @@ function sample(b, rt) {
 }
 
 // ---------- drawing ----------
-function setBig(i) { VIEW.big = i; T.forEach((t, k) => { t.el.classList.toggle('big', k === i); t.el.classList.toggle('f', k === i); }); }
+function setBig(i) { VIEW.big = i; T.forEach((t, k) => t.el.classList.toggle('big', k === i)); if (typeof pushKeys === 'function') pushKeys(); }
 function fitCanvas(c) { const r = c.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1), w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d)); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } return { W: r.width, H: r.height, d }; }
 function drawGhost(g, c) { g.save(); g.globalAlpha = 0.35; drawCar(g, c, false); g.restore(); }
 function drawTile(t, now, dt) {
@@ -170,8 +178,37 @@ function frame() { const now = performance.now(), dt = Math.min(0.1, (now - last
 requestAnimationFrame(frame);
 // ---------- view keys (only change this page) ----------
 function paintBtns() { $('rot').classList.toggle('on', VIEW.rot); $('ov').classList.toggle('on', VIEW.ov); }
+document.querySelectorAll('#bar button').forEach(b => b.addEventListener('mouseup', () => b.blur()));
 $('rot').onclick = () => { VIEW.rot = !VIEW.rot; paintBtns(); }; $('ov').onclick = () => { VIEW.ov = !VIEW.ov; paintBtns(); };
 $('fs').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => { });
-addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === 'r') $('rot').onclick(); else if (k === 'o') $('ov').onclick(); else if (k === 'f') $('fs').onclick(); else if (k === 'escape') setBig(-1); else if (k === '+' || k === '=') VIEW.zoom = Math.min(3, VIEW.zoom * 1.15); else if (k === '-') VIEW.zoom = Math.max(0.3, VIEW.zoom / 1.15); else if (/^[1-9]$/.test(k) && +k <= T.length) setBig(VIEW.big === +k - 1 ? -1 : +k - 1); });
-if (T.length === 1) setBig(-1);
+// ---------- driving (Drive mode only): only key presses are sent, and their game only accepts them while remote control is allowed ----------
+const KEYMAP = { arrowleft: 'l', a: 'l', arrowright: 'r', d: 'r', arrowup: 'u', w: 'u', arrowdown: 'd', s: 'd', ' ': 'h' }, ZERO = () => ({ l: 0, r: 0, u: 0, d: 0, h: 0 });
+let FOCUS = Math.max(0, T.findIndex(t => t.p.rc)), OFF = false;
+const drivable = t => DRIVE && t.p.rc;
+function targets() { return T.filter((t, i) => drivable(t) && ($('all').checked || i === FOCUS)); }
+function pushKeys() {
+  if (!DRIVE) return;
+  for (const t of T) { if (!drivable(t)) continue; const ks = OFF ? ZERO() : t.ks, any = ks.l || ks.r || ks.u || ks.d || ks.h;
+    if (t.sub && (any || !t.sentZero)) { try { t.ch.send({ type: 'broadcast', event: 'in', payload: ks }); } catch (e) { } t.sentZero = !any; }
+    t.keyEls.forEach(k => k.classList.toggle('on', !OFF && !!ks[k.dataset.k])); }
+  T.forEach((t, i) => t.el.classList.toggle('f', DRIVE ? drivable(t) && ($('all').checked || i === FOCUS) : VIEW.big === i));
+}
+function release() { for (const t of T) t.ks = ZERO(); pushKeys(); }
+function setFocus(i) { if (i < 0 || i >= T.length) return; if (DRIVE && !T[i].p.rc) return; release(); FOCUS = i; pushKeys(); }
+function onKey(e) {
+  if (/INPUT|TEXTAREA|SELECT/.test((document.activeElement || {}).tagName || '') && e.key !== ' ' && !e.key.startsWith('Arrow')) return;
+  const k = e.key.toLowerCase(), dn = e.type === 'keydown';
+  if (DRIVE && k in KEYMAP) { e.preventDefault(); if (OFF) return; const v = dn ? 1 : 0; for (const t of targets()) t.ks[KEYMAP[k]] = v; pushKeys(); return; }
+  if (!dn || e.repeat) return;
+  if (k === 'r') $('rot').onclick(); else if (k === 'o') $('ov').onclick(); else if (k === 'f') $('fs').onclick();
+  else if (k === 'escape') { if (DRIVE) { OFF = !OFF; $('off').style.display = OFF ? 'inline' : 'none'; release(); } else setBig(-1); }
+  else if (k === '+' || k === '=') VIEW.zoom = Math.min(3, VIEW.zoom * 1.15); else if (k === '-') VIEW.zoom = Math.max(0.3, VIEW.zoom / 1.15);
+  else if (/^[1-9]$/.test(k) && +k <= T.length) { if (DRIVE) { setFocus(+k - 1); if (VIEW.big >= 0) setBig(+k - 1); } else setBig(VIEW.big === +k - 1 ? -1 : +k - 1); }
+}
+addEventListener('keydown', onKey); addEventListener('keyup', onKey); addEventListener('blur', release); addEventListener('beforeunload', release);
+document.addEventListener('visibilitychange', () => { if (document.hidden) release(); });
+$('all').onchange = () => { release(); $('all').blur(); };
+setInterval(pushKeys, 150); // their game drops keys it hasn't heard for 0.8 s, so a lost update can never leave a key stuck
+pushKeys();
+
 </script></body></html>

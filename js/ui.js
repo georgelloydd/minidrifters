@@ -224,7 +224,16 @@ keysHint();
 // Published tracks (tracks.json in the repo, written by /build) replace the built-in list; ?test=1 adds the builder's test track
 let TEST_IDX = -1;
 async function loadTracks() {
-  try { const r = await fetch('tracks.json?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) { const j = await r.json(); const L = (j.tracks || []).filter(t => t && Array.isArray(t.pts) && t.pts.length >= 4); if (L.length) TRACKS.splice(0, TRACKS.length, ...L); } } catch (e) { }
+  // 1) tracks kept in Supabase (what the dev site publishes)  2) tracks.json backup in the repo  3) built-in tracks
+  const good = l => (Array.isArray(l) ? l : []).filter(t => t && Array.isArray(t.pts) && t.pts.length >= 4);
+  let L = [];
+  try { if (typeof ONLINE !== 'undefined' && ONLINE.SUPABASE_URL && ONLINE.SUPABASE_ANON_KEY) {
+    const u = ONLINE.SUPABASE_URL.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, ''), k = ONLINE.SUPABASE_ANON_KEY.trim(), h = { apikey: k }; if (k.startsWith('eyJ')) h.Authorization = 'Bearer ' + k;
+    const ac = new AbortController(), to = setTimeout(() => ac.abort(), 5000);
+    const r = await fetch(u + '/rest/v1/track_store?id=eq.1&select=data', { headers: h, cache: 'no-store', signal: ac.signal }); clearTimeout(to);
+    if (r.ok) { const j = await r.json(); L = good(j && j[0] && j[0].data); } } } catch (e) { }
+  if (!L.length) try { const r = await fetch('tracks.json?t=' + Date.now(), { cache: 'no-store' }); if (r.ok) { const j = await r.json(); L = good(j.tracks); } } catch (e) { }
+  if (L.length) TRACKS.splice(0, TRACKS.length, ...L);
   if (new URLSearchParams(location.search).has('test')) { try { const hp = new URLSearchParams(location.hash.slice(1)).get('track'); const d = hp ? JSON.parse(decodeURIComponent(escape(atob(hp)))) : JSON.parse(localStorage.getItem('md_test_track') || 'null'); if (d && Array.isArray(d.pts) && d.pts.length >= 4) { d.test = true; d.name = (d.name || 'Track') + ' (test)'; TRACKS.push(d); TEST_IDX = TRACKS.length - 1; } } catch (e) { } }
   if (!(CFG.track >= 0 && CFG.track < TRACKS.length) || ((TRACKS[CFG.track].test || TRACKS[CFG.track].hidden) && CFG.track !== TEST_IDX)) CFG.track = Math.max(0, TRACKS.findIndex(t => !t.hidden && !t.test));
   G.attract = null;
