@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>Mini Drifters · Spectate</title>
+<style>
+:root{--red:#ff2a2a;--bg:#0a0a0c;--p:#141417;--line:#2a2a30;--txt:#e9e9ee}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:14px/1.4 'Segoe UI',Arial,sans-serif;overflow:hidden}
+#bar{display:flex;gap:10px;align-items:center;padding:8px 12px;background:var(--p);border-bottom:1px solid var(--line);height:44px}
+#bar b{font-style:italic;font-weight:900;letter-spacing:1px}#hint{color:#8a8a94;font-size:12px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:#1b1b20;color:#eee;border-radius:5px;padding:5px 11px;font-weight:700}button.on{background:var(--red);border-color:var(--red)}
+#grid{display:grid;gap:6px;padding:6px;height:calc(100% - 44px)}
+.tile{position:relative;background:#000;border:2px solid var(--line);border-radius:8px;overflow:hidden;min-height:0;cursor:pointer}.tile.f{border-color:var(--red)}.tile.big{grid-column:1/-1;grid-row:1/-1;z-index:2}
+.tile canvas.view{position:absolute;inset:0;width:100%;height:100%;display:block}
+.tag{position:absolute;left:10px;top:8px;background:rgba(10,10,12,.82);border:1px solid var(--line);border-left:3px solid var(--red);border-radius:6px;padding:3px 9px;font-weight:800;font-size:13px;display:flex;gap:8px;align-items:center}
+.dot{width:9px;height:9px;border-radius:50%;background:#666}.dot.ok{background:#3ddc84;box-shadow:0 0 6px #3ddc84}.dot.wait{background:#ffb02e}.dot.bad{background:#ff4b4b}
+.state{font-weight:700;font-size:11px;letter-spacing:1px;text-transform:uppercase;color:#bbb}
+.hud{position:absolute;right:10px;top:8px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:70%}
+.hb{background:rgba(10,10,12,.82);border:1px solid var(--line);border-radius:6px;padding:3px 9px;text-align:center;min-width:64px}.hb small{display:block;font-size:9px;letter-spacing:1.5px;color:#8a8a94;font-weight:800}.hb b{font-size:15px;font-variant-numeric:tabular-nums}
+.spd{position:absolute;right:12px;bottom:10px;background:rgba(10,10,12,.82);border:1px solid var(--line);border-radius:8px;padding:4px 12px;font-weight:900;font-size:26px;font-style:italic;font-variant-numeric:tabular-nums}.spd small{font-size:11px;color:#8a8a94;font-style:normal;margin-left:4px}
+.drift{position:absolute;left:50%;top:14%;transform:translateX(-50%);font-weight:900;font-style:italic;font-size:26px;color:#ffd400;text-shadow:0 2px 6px #000;display:none}
+.mini{position:absolute;left:10px;bottom:10px;width:176px;height:128px;background:rgba(10,10,12,.6);border:1px solid var(--line);border-radius:6px}
+.st{position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;align-items:center;justify-content:center;text-align:center;color:#c9c9d2;font-size:18px;pointer-events:none;padding:20px;background:rgba(6,6,8,.72)}.st.hide{display:none}.st small{color:#8a8a94;font-size:13px}
+.cd{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-size:110px;font-weight:900;font-style:italic;color:#fff;text-shadow:0 4px 20px #000;pointer-events:none}
+#msg{padding:30px;color:#ff6b6b}
+</style></head><body>
+<div id="bar"><b>👁 SPECTATE</b><span id="hint">View only: nothing you do here reaches their game · click a screen to enlarge · 1-9 pick · R rotate camera · O whole track · mouse wheel zoom · F fullscreen</span>
+<button id="rot" title="R">Rotate cam</button><button id="ov" title="O">Whole track</button><button id="fs">Fullscreen</button></div>
+<div id="grid"></div>
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="js/config.js"></script>
+<script src="js/track.js"></script>
+<script src="js/car.js"></script>
+<script src="js/cars.js"></script>
+<script>
+// View-only spectator. The player's game sends where its cars are a few times a second; this page draws the race itself.
+// It never sends inputs or settings, so nothing happens to the player. No video stream, so it works on any network.
+const $ = id => document.getElementById(id), vid = 'w' + Math.random().toString(36).slice(2, 9);
+let LIST = []; try { LIST = JSON.parse(decodeURIComponent(escape(atob(decodeURIComponent(location.hash.slice(1)))))); } catch (e) { }
+const SB = window.SPECTATE_CLIENT || (() => { try { return supabase.createClient(ONLINE.SUPABASE_URL.trim().replace(/\/+$/, '').replace(/\/rest\/v1$/, ''), ONLINE.SUPABASE_ANON_KEY.trim(), { auth: { persistSession: false, autoRefreshToken: false }, realtime: { params: { eventsPerSecond: 20 } } }); } catch (e) { return null; } })();
+if (!LIST.length || !SB) { document.body.innerHTML = '<div id="msg">Open this page with the Spectate button on the dev site\'s Troll tab.</div>'; throw new Error('no config'); }
+const TRK = new Map(); // track key -> built track (shared between screens)
+const DELAY = 230; // ms behind live, so movement is smooth between updates
+const VIEW = { rot: false, ov: false, zoom: 1, big: -1 };
+const fmt = ms => { if (!ms) return '--'; const m = Math.floor(ms / 60000), s = (ms % 60000) / 1000; return m + ':' + s.toFixed(3).padStart(6, '0'); };
+const lookOf = (L, name) => { L = L || []; const o = { body: L[0], color: L[1], accent: L[2], accent2: L[3], livery: L[4], num: L[5], finish: L[6], rim: L[7], glow: L[8], helmet: L[9] }; let l; try { l = carLook(o); } catch (e) { l = { body: 'drift', color: L[1] || '#ff3b3b' }; } l.name = name; return l; };
+const STATE_TXT = { countdown: 'Starting', race: 'Racing', over: 'Finished', board: 'Results', menu: 'In menu', lobby: 'In lobby' };
+const grid = $('grid'), cols = Math.ceil(Math.sqrt(LIST.length)); grid.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)'; grid.style.gridTemplateRows = 'repeat(' + Math.ceil(LIST.length / cols) + ',1fr)';
+
+const T = LIST.map((p, i) => {
+  const el = document.createElement('div'); el.className = 'tile';
+  el.innerHTML = '<canvas class="view"></canvas><div class="drift"></div><div class="cd"></div><canvas class="mini" width="352" height="256"></canvas><div class="spd">0<small>km/h</small></div><div class="hud"></div><div class="tag"><span class="dot"></span><span class="nm"></span><span class="state"></span></div><div class="st">Connecting…</div>';
+  grid.appendChild(el); el.querySelector('.nm').textContent = (LIST.length > 1 ? (i + 1) + ' · ' : '') + p.name;
+  el.onclick = () => setBig(VIEW.big === i ? -1 : i);
+  const t = { p, i, el, cv: el.querySelector('canvas.view'), mini: el.querySelector('canvas.mini'), st: el.querySelector('.st'), dot: el.querySelector('.dot'), state: el.querySelector('.state'), hud: el.querySelector('.hud'), spd: el.querySelector('.spd'), drift: el.querySelector('.drift'), cd: el.querySelector('.cd'),
+    ch: null, sub: false, here: false, last: null, lastAt: 0, key: '', tr: null, buf: new Map(), look: new Map(), cam: { x: 0, y: 0, z: 0.5, a: 0 }, smoke: [], skid: [], subAt: 0, joinedAt: 0, miniKey: '', miniC: null };
+  t.cv.addEventListener('wheel', e => { e.preventDefault(); VIEW.zoom = Math.max(0.3, Math.min(3, VIEW.zoom * (e.deltaY > 0 ? 0.9 : 1.1))); }, { passive: false });
+  join(t); return t;
+});
+
+// ---------- connection: one realtime channel per player, rebuilt automatically if it drops ----------
+function join(t) {
+  if (t.ch) { try { t.ch.unsubscribe(); SB.removeChannel(t.ch); } catch (e) { } }
+  t.sub = false; t.here = false; t.subAt = Date.now();
+  const ch = t.ch = SB.channel('md-ctl-' + t.p.pid + '-' + t.p.rct, { config: { broadcast: { self: false }, presence: { key: 'spec-' + vid } } });
+  ch.on('broadcast', { event: 'watch' }, m => { if (t.ch === ch) onMsg(t, m && m.payload); });
+  ch.on('presence', { event: 'sync' }, () => { if (t.ch !== ch) return; t.here = Object.keys(ch.presenceState()).includes('v'); hello(t); });
+  ch.subscribe(s => { if (t.ch !== ch) return; t.sub = s === 'SUBSCRIBED'; if (t.sub) { t.joinedAt = Date.now(); hello(t); } else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') setTimeout(() => { if (t.ch === ch) join(t); }, 2500); });
+}
+function hello(t) { if (t.sub) try { t.ch.send({ type: 'broadcast', event: 'watch', payload: { k: 'hi', from: vid, have: t.tr ? t.key : '' } }); } catch (e) { } }
+setInterval(() => { for (const t of T) { hello(t); const quiet = Date.now() - Math.max(t.lastAt, t.joinedAt); if (t.sub && t.here && quiet > 12000) join(t); else if (!t.sub && Date.now() - t.subAt > 10000) join(t); } }, 2000);
+
+function onMsg(t, p) {
+  if (!p) return; const now = performance.now();
+  if (p.k === 'trk' && p.def && p.key) { if (!TRK.has(p.key)) { try { TRK.set(p.key, buildTrack(p.def)); } catch (e) { return; } } if (p.key === t.key || !t.tr) useTrack(t, p.key); return; }
+  if (p.k !== 'pos') return;
+  t.last = p; t.lastAt = Date.now(); t.here = true;
+  if (!p.me) return;
+  if (p.key !== t.key) { t.key = p.key; t.tr = null; t.buf.clear(); t.skid = []; if (TRK.has(p.key)) useTrack(t, p.key); else hello(t); }
+  if (p.look) t.look.set('me', lookOf(p.look, p.name || t.p.name));
+  push(t, 'me', now, p.me[0], p.me[1], p.me[2], p.me[6], p.me[7], p.me[5]);
+  const seen = new Set(['me']);
+  for (const r of p.rem || []) { const id = 'r' + r[0]; seen.add(id); if (r[7]) t.look.set(id, lookOf(r[7], r[6])); push(t, id, now, r[1], r[2], r[3], r[4], r[5], 0); }
+  if (p.gh) { seen.add('ghost'); push(t, 'ghost', now, p.gh[0], p.gh[1], p.gh[2], 0, 0, 0); }
+  for (const id of [...t.buf.keys()]) if (!seen.has(id)) t.buf.delete(id);
+}
+function useTrack(t, key) { t.key = key; t.tr = TRK.get(key); const me = t.buf.get('me'); if (!me) { const p0 = t.tr.pts[0]; t.cam.x = p0[0]; t.cam.y = p0[1]; } }
+function push(t, id, now, x, y, a, fl, layer, steer) {
+  let b = t.buf.get(id); if (!b) t.buf.set(id, b = []);
+  const prev = b[b.length - 1]; if (prev && Math.hypot(x - prev.x, y - prev.y) > 700) b.length = 0; // respawn / reset: jump, don't slide
+  b.push({ t: now, x, y, a, fl, layer, steer }); while (b.length > 30) b.shift();
+}
+function angDiffS(a, b) { let d = a - b; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; }
+// smooth position at render time (a little behind live), extrapolating briefly if an update is late
+function sample(b, rt) {
+  if (!b || !b.length) return null; if (b.length === 1 || rt <= b[0].t) return b[0];
+  for (let i = b.length - 1; i > 0; i--) { const A = b[i - 1], B = b[i]; if (rt >= A.t && rt <= B.t) { const f = (rt - A.t) / (B.t - A.t || 1); return { x: A.x + (B.x - A.x) * f, y: A.y + (B.y - A.y) * f, a: A.a + angDiffS(B.a, A.a) * f, fl: B.fl, layer: B.layer, steer: A.steer + (B.steer - A.steer) * f }; } }
+  const A = b[b.length - 2], B = b[b.length - 1], dt = Math.min(350, rt - B.t), k = dt / (B.t - A.t || 1);
+  return { x: B.x + (B.x - A.x) * k, y: B.y + (B.y - A.y) * k, a: B.a + angDiffS(B.a, A.a) * k, fl: B.fl, layer: B.layer, steer: B.steer };
+}
+
+// ---------- drawing ----------
+function setBig(i) { VIEW.big = i; T.forEach((t, k) => { t.el.classList.toggle('big', k === i); t.el.classList.toggle('f', k === i); }); }
+function fitCanvas(c) { const r = c.getBoundingClientRect(), d = Math.min(2, devicePixelRatio || 1), w = Math.max(1, Math.round(r.width * d)), h = Math.max(1, Math.round(r.height * d)); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } return { W: r.width, H: r.height, d }; }
+function drawGhost(g, c) { g.save(); g.globalAlpha = 0.35; drawCar(g, c, false); g.restore(); }
+function drawTile(t, now, dt) {
+  const { W, H, d } = fitCanvas(t.cv), g = t.cv.getContext('2d'), p = t.last, tr = t.tr;
+  // status overlay + connection dot
+  const fresh = t.lastAt && Date.now() - t.lastAt < 3000, inRace = p && p.me;
+  t.dot.className = 'dot ' + (fresh ? 'ok' : t.sub ? 'wait' : 'bad');
+  t.state.textContent = p ? (STATE_TXT[p.s] || p.s || '') : '';
+  let msg = '';
+  if (!t.sub) msg = 'Connecting…<small>Joining the live channel</small>';
+  else if (!t.here && !fresh) msg = '⚪ ' + esc(t.p.name) + ' is not in the game right now<small>This screen comes alive by itself as soon as they open the game (within about 15 seconds of Save).</small>';
+  else if (!p || !fresh) msg = 'Waiting for their game…<small>' + (t.lastAt ? 'Signal lost for ' + Math.round((Date.now() - t.lastAt) / 1000) + ' s, reconnecting automatically' : 'They are online, the first update is on its way') + '</small>';
+  else if (!inRace) msg = (p.s === 'lobby' ? '🛋 In a lobby' : '🏠 In the menu') + '<small>Their race shows here as soon as they start driving</small>';
+  else if (!tr) msg = 'Loading their track…';
+  t.st.classList.toggle('hide', !msg); if (msg && t.st._m !== msg) { t.st._m = msg; t.st.innerHTML = msg; }
+  g.setTransform(d, 0, 0, d, 0, 0);
+  if (!tr) { g.fillStyle = '#0b0b0e'; g.fillRect(0, 0, W, H); t.hud.innerHTML = ''; t.spd.style.display = 'none'; t.mini.style.display = 'none'; t.drift.style.display = 'none'; t.cd.style.display = 'none'; return; }
+  const rt = now - DELAY, cars = [];
+  for (const [id, b] of t.buf) { const s = sample(b, rt); if (!s) continue; if (s.fl & 8) continue; const lk = t.look.get(id) || (id === 'ghost' ? t.look.get('me') : null) || { body: 'drift', color: '#888' }; cars.push(Object.assign({}, lk, { id, x: s.x, y: s.y, a: s.a, steer: s.steer || 0, drift: !!(s.fl & 1), brake: !!(s.fl & 2), hb: !!(s.fl & 4), fin: !!(s.fl & 16), layer: s.layer, name: id === 'ghost' ? '' : lk.name })); }
+  const me = cars.find(c => c.id === 'me'), cam = t.cam, base = Math.min(W, H) / 820, spd = p && p.me ? p.me[8] : 0;
+  // camera
+  const k = 1 - Math.exp(-dt * 6);
+  if (VIEW.ov) { const z = Math.min(W / (tr.W || WORLD_W), H / (tr.H || WORLD_H)) * 0.95; cam.z += (z - cam.z) * k; cam.x += ((tr.W || WORLD_W) / 2 - cam.x) * k; cam.y += ((tr.H || WORLD_H) / 2 - cam.y) * k; cam.a += angDiffS(0, cam.a) * k; }
+  else if (me) { const zt = base * (1.08 - Math.min(1, spd / CAR.MAXS) * 0.32) * VIEW.zoom, vx = p.me[3], vy = p.me[4]; cam.z += (zt - cam.z) * (1 - Math.exp(-dt * 2)); if (Math.hypot(me.x - cam.x, me.y - cam.y) > 1500) { cam.x = me.x; cam.y = me.y; } cam.x += (me.x + vx * 0.3 - cam.x) * k; cam.y += (me.y + vy * 0.3 - cam.y) * k; cam.a += angDiffS(VIEW.rot ? -me.a - Math.PI / 2 : 0, cam.a) * (1 - Math.exp(-dt * 4)); }
+  const rot = Math.abs(cam.a) > 1e-3, night = p.wx === 'auto' ? !!(tr.th && tr.th.night) : (p.wx === 'night' || p.wx === 'storm');
+  g.fillStyle = shadeHex((tr.th && tr.th.grass) || '#4c8c3c', 0.55); g.fillRect(0, 0, W, H);
+  g.save(); g.translate(W / 2, H / 2); if (rot) g.rotate(cam.a); g.scale(cam.z, cam.z); g.translate(-cam.x, -cam.y);
+  const hd = Math.hypot(W, H) / 2 / cam.z + 20, sx = Math.max(0, cam.x - hd), sy = Math.max(0, cam.y - hd), sw = Math.min(tr.W || WORLD_W, cam.x + hd) - sx, sh = Math.min(tr.H || WORLD_H, cam.y + hd) - sy, bs = tr.bs || 1;
+  if (sw > 0 && sh > 0 && tr.canvas) { g.drawImage(tr.canvas, sx * bs, sy * bs, sw * bs, sh * bs, sx, sy, sw, sh); if (bs < 0.99) try { drawRoadLive(g, tr, sx, sy, sx + sw, sy + sh); } catch (e) { } }
+  // tyre marks while drifting
+  if (me && (me.drift || me.hb)) { const ca = Math.cos(me.a), sa = Math.sin(me.a); for (const s of [-1, 1]) t.skid.push([me.x - ca * 18 - sa * s * 12, me.y - sa * 18 + ca * s * 12, now]); }
+  if (t.skid.length > 1600) t.skid.splice(0, t.skid.length - 1600);
+  g.fillStyle = 'rgba(15,15,18,.28)'; for (const q of t.skid) { g.beginPath(); g.arc(q[0], q[1], 3.5, 0, 7); g.fill(); }
+  if (night && sw > 0) { g.fillStyle = 'rgba(4,6,22,.55)'; g.fillRect(sx, sy, sw, sh); }
+  try { drawWalls(g, tr); drawTunnelFloor(g, tr); } catch (e) { }
+  // smoke
+  for (const c of cars) if (c.drift && c.id !== 'ghost' && Math.random() < 0.7) t.smoke.push({ x: c.x - Math.cos(c.a) * 22 + (Math.random() - 0.5) * 16, y: c.y - Math.sin(c.a) * 22 + (Math.random() - 0.5) * 16, r: 10, life: 0, max: 0.9 });
+  for (const s of t.smoke) { s.life += dt; s.r += dt * 30; } t.smoke = t.smoke.filter(s => s.life < s.max).slice(-220);
+  for (const s of t.smoke) { g.globalAlpha = (1 - s.life / s.max) * 0.45; g.fillStyle = night ? '#aab4e6' : '#eeeef2'; g.beginPath(); g.arc(s.x, s.y, s.r, 0, 7); g.fill(); } g.globalAlpha = 1;
+  const order = [...cars.filter(c => c.id !== 'me'), ...(me ? [me] : [])], hi = [];
+  const dc = c => { try { if (c.id === 'ghost' || c.fin) drawGhost(g, c); else drawCar(g, c, night); } catch (e) { } };
+  for (const c of order) { if (c.layer === 1) hi.push(c); else dc(c); }
+  try { drawTunnelRoof(g, tr, 0.9); drawBridges(g, tr); } catch (e) { } hi.forEach(dc);
+  g.restore();
+  // name tags
+  g.font = '700 13px Segoe UI, system-ui, sans-serif'; g.textAlign = 'center';
+  for (const c of cars) { if (!c.name) continue; let dx = (c.x - cam.x) * cam.z, dy = (c.y - cam.y) * cam.z; if (rot) { const cs = Math.cos(cam.a), sn = Math.sin(cam.a); [dx, dy] = [dx * cs - dy * sn, dx * sn + dy * cs]; } const x = W / 2 + dx, y = H / 2 + dy, w = g.measureText(c.name).width + 14;
+    g.fillStyle = c.id === 'me' ? 'rgba(255,42,42,.85)' : 'rgba(0,0,0,.55)'; g.beginPath(); g.roundRect(x - w / 2, y - 52, w, 20, 8); g.fill(); g.fillStyle = '#fff'; g.fillText(c.name, x, y - 37); }
+  const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.45, W / 2, H / 2, Math.hypot(W, H) * 0.6); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.35)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
+  drawMini(t, cars); hudOf(t, p);
+}
+function drawMini(t, cars) {
+  const tr = t.tr, m = t.mini.getContext('2d'); t.mini.style.display = ''; const S = 2;
+  if (t.miniKey !== t.key) { t.miniKey = t.key; const c = t.miniC = document.createElement('canvas'); c.width = 352; c.height = 256; const g = c.getContext('2d'), s = Math.min(320 / (tr.W || WORLD_W), 224 / (tr.H || WORLD_H)); g.translate(16, 16); g.scale(s, s); g.lineJoin = 'round'; pathTrack(g, tr); g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = Math.max(tr.w + 60, 14 / s); g.stroke(); g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = Math.max(tr.w * 0.55, 6 / s); g.stroke(); t.miniS = s; }
+  m.clearRect(0, 0, 352, 256); m.drawImage(t.miniC, 0, 0); const s = t.miniS, p0 = tr.pts[0]; m.fillStyle = '#fff'; m.fillRect(16 + p0[0] * s - 5, 16 + p0[1] * s - 5, 10, 10);
+  for (const c of cars) { if (c.id === 'ghost') continue; m.fillStyle = c.color || '#888'; m.strokeStyle = c.id === 'me' ? '#fff' : '#000'; m.lineWidth = 3; m.beginPath(); m.arc(16 + c.x * s, 16 + c.y * s, c.id === 'me' ? 11 : 8, 0, 7); m.fill(); m.stroke(); }
+}
+function hudOf(t, p) {
+  const box = (l, v) => `<div class="hb"><small>${l}</small><b>${v}</b></div>`, multi = p.cnt > 1;
+  const lap = p.tt ? p.tt + ' / ∞' : p.laps ? Math.min(p.laps, Math.max(1, p.lap + 1)) + '/' + p.laps : '';
+  const h = (multi ? box('POS', p.pos + '/' + p.cnt) : '') + (lap ? box('LAP', lap) : '') + box(p.tt ? 'LAP TIME' : 'TIME', fmt(p.lapT) === '--' ? '0:00.000' : fmt(p.lapT)) + box('BEST', fmt(p.best)) + (p.last ? box('LAST', fmt(p.last)) : '') + (p.mode === 'drift' || p.mode === 'tandem' || p.score ? box('SCORE', (p.score || 0).toLocaleString()) : '') + (p.wrong ? box('⚠', 'WRONG WAY') : '');
+  if (t.hud._h !== h) { t.hud._h = h; t.hud.innerHTML = h; }
+  t.spd.style.display = ''; const sp = Math.round((p.me[8] || 0) * 0.25) + '<small>km/h</small>'; if (t.spd._h !== sp) { t.spd._h = sp; t.spd.innerHTML = sp; }
+  t.drift.style.display = p.cur > 0 ? 'block' : 'none'; if (p.cur > 0) t.drift.textContent = p.cur.toLocaleString() + '  x' + (p.combo || 1);
+  t.cd.style.display = p.s === 'countdown' && p.cd > 0 ? 'flex' : 'none'; if (p.cd > 0) t.cd.textContent = p.cd;
+}
+function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+let lastF = performance.now();
+function frame() { const now = performance.now(), dt = Math.min(0.1, (now - lastF) / 1000); lastF = now; for (const t of T) { if (VIEW.big >= 0 && VIEW.big !== t.i) continue; try { drawTile(t, now, dt); } catch (e) { console.error(e); } } requestAnimationFrame(frame); }
+requestAnimationFrame(frame);
+// ---------- view keys (only change this page) ----------
+function paintBtns() { $('rot').classList.toggle('on', VIEW.rot); $('ov').classList.toggle('on', VIEW.ov); }
+$('rot').onclick = () => { VIEW.rot = !VIEW.rot; paintBtns(); }; $('ov').onclick = () => { VIEW.ov = !VIEW.ov; paintBtns(); };
+$('fs').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => { });
+addEventListener('keydown', e => { const k = e.key.toLowerCase(); if (k === 'r') $('rot').onclick(); else if (k === 'o') $('ov').onclick(); else if (k === 'f') $('fs').onclick(); else if (k === 'escape') setBig(-1); else if (k === '+' || k === '=') VIEW.zoom = Math.min(3, VIEW.zoom * 1.15); else if (k === '-') VIEW.zoom = Math.max(0.3, VIEW.zoom / 1.15); else if (/^[1-9]$/.test(k) && +k <= T.length) setBig(VIEW.big === +k - 1 ? -1 : +k - 1); });
+if (T.length === 1) setBig(-1);
+</script></body></html>
