@@ -24,23 +24,24 @@ function rec(tr) { return JSON.parse(localStorage.getItem('md_rec_' + tr) || '{}
 function setRec(tr, r) { localStorage.setItem('md_rec_' + tr, JSON.stringify(r)); }
 function myId() { return G.mp ? NET.myId : 'me'; }
 
-function startSession(cfg, grid, mp, rid) {
+function startSession(cfg, grid, mp, rid, spec) {
   if (SESS.blocked) return;
   if (cfg.mode === 'tt') { cfg = Object.assign({}, cfg, { laps: 0 }); mp = false; grid = null; }
+  if (cfg.mode === 'bomb') cfg = Object.assign({}, cfg, { laps: 0 }); G.spec = false; G.specId = null; G.specWhy = ''; G.bomb = null; G.bombC = null; G.splitBad = null;
   G.tt = cfg.mode === 'tt' ? { laps: 0, restarts: 0, cps: 0, start: 0 } : null; G.dist = 0; G.wx = cfg.mode === 'tt' ? 'auto' : (cfg.wx || 'auto'); G.rain = [];
   G.cfg = cfg; G.mp = mp; G.tr = buildTrack(cfg.track); G.rem.clear(); G.res.clear(); G.resList = null; G.final = false; G.firstFin = 0; G.smoke = []; G.flag = false; G.rid = rid || 0; for (const k in KEYS) KEYS[k] = false; if (typeof rkReset === 'function') rkReset();
-  grid = grid || [myId()];
+  grid = grid || [myId()]; if (spec) grid = [...grid.filter(id => id !== myId()), myId()];
   grid.forEach((id, slot) => {
     if (id === myId()) { G.me = newCar(slot, G.tr, id, CFG.name, CFG.color); Object.assign(G.me, carLook(CFG)); G.me.cpI = null; G.me.tw = TWEAKS; if (G.wx === 'rain' || G.wx === 'storm') G.me.tw = Object.assign({}, TWEAKS || {}, { grip: ((TWEAKS && TWEAKS.grip) || 1) * 0.86 }); }
     else { const p = G.plist.find(q => q.id === id) || { name: 'Driver', color: '#888' }; const rc = newCar(slot, G.tr, id, p.name, p.color); Object.assign(rc, carLook(p)); rc.color = carLook(p).color; G.rem.set(id, { car: rc, tgt: null, raw: null }); }
   });
   G.ghost = null; G.ghostCar = null; G.curSplits = []; G.splitStart = null; G.recL = null; G.recStart = null;
   if (G.tt) { applySpawn(G.me); const pick = G.ghostPick; G.ghostPick = null; setGhost(pick ? pick.rep : localStorage.getItem('md_rep_' + cfg.track), pick); if (!pick) pbRepCloud(cfg.track).then(r => { if (r && G.tt && G.cfg.track === cfg.track && (!G.ghostCar || G.ghostCar.own)) setGhost(r, null); }); }
-  G.cam.x = G.me.x; G.cam.y = G.me.y; G.cam.a = -G.me.a - Math.PI / 2;
+  G.cam.x = G.me.x; G.cam.y = G.me.y; G.cam.a = -G.me.a - Math.PI / 2; if (spec && typeof goSpectate === 'function') goSpectate('Round in progress');
   for (const s of ['menu', 'lobby', 'board']) $(s).classList.add('hidden');
   for (const s of ['hud', 'speedo', 'mini']) $(s).classList.remove('hidden');
   $('hLap').style.display = cfg.laps || G.tt ? '' : 'none'; $('hKeys').classList.toggle('hidden', !G.tt); $('hKeys').textContent = keyName(CFG.keys.reset) + ' restart lap · ' + keyName(CFG.keys.cp) + ' last checkpoint · ESC end session'; $('hTime').querySelector('small').textContent = G.tt ? 'LAP TIME' : 'TIME'; $('hPos').style.display = G.rem.size ? '' : 'none';
-  G.state = 'countdown'; G.cdEnd = performance.now() + (cfg.laps ? 3200 : G.tt ? 0 : 600); G.t0 = G.cdEnd; buildMini();
+  G.state = 'countdown'; G.cdEnd = performance.now() + (cfg.laps ? 3200 : G.tt ? 0 : 600); G.t0 = G.cdEnd; if (G.spec) G.cdEnd = G.t0 = performance.now(); buildMini();
   sndInit();
 }
 function segOf(i) { const g = G.tr.gates; let s = 0; while (s < g.length && g[s].i <= i) s++; return s; }
@@ -80,9 +81,9 @@ function hostRes(force) {
   const list = ids.map(id => { const p = id === 'host' ? { name: CFG.name, color: CFG.color } : G.rem.get(id).car; const r = G.res.get(id); return { id, name: p.name, color: p.color, time: r ? r.time : 0, laps: r ? r.laps : 0, score: r ? r.score : (id === 'host' ? G.me.score : G.rem.get(id).car.score) }; });
   netSend({ t: 'res', list, final, rid: G.rid }); applyRes(list, final);
 }
-function applyRes(list, final) { G.resList = list; G.final = final; if (final) NET.inRace = false; if (G.me.finished || final) showBoard(); }
+function applyRes(list, final) { G.resList = list; G.final = final; if (final) NET.inRace = false; if ((G.me.finished && !G.spec) || final) showBoard(); }
 function showBoard() {
-  if (!G.resList) return; const drift = G.cfg.mode === 'drift' || G.cfg.mode === 'tandem', L = [...G.resList];
+  if (!G.resList) return; if (G.cfg && G.cfg.mode === 'bomb' && typeof showBombBoard === 'function') return showBombBoard(); const drift = G.cfg.mode === 'drift' || G.cfg.mode === 'tandem', L = [...G.resList];
   L.sort((a, b) => drift ? b.score - a.score : (!!b.time - !!a.time) || ((b.laps || 0) - (a.laps || 0)) || (a.time || 1e12) - (b.time || 1e12)); const maxL = Math.max(0, ...L.map(p => p.time ? p.laps || 0 : 0));
   const r = rec(G.cfg.track);
   let h = `<h2>${G.final ? (drift ? '💨 DRIFT BATTLE RESULTS' : '🏁 RACE RESULTS') : 'RESULTS (waiting for others…)'}</h2><table>`;
@@ -125,9 +126,9 @@ function tickInner(ts, bg) {
   // remote cars
   for (const [id, r] of G.rem) { if (!r.tgt) continue; const c = r.car; interpRemote(r, c, now);
     const dx = me.x - c.x, dy = me.y - c.y, dd = Math.hypot(dx, dy); if (dd < 44 && dd > 0.01 && racing && !c.finished && !me.finished && !me.dead && !(c.deadUntil > now)) { const nx = dx / dd, ny = dy / dd; me.x += nx * (44 - dd); me.y += ny * (44 - dd); const rv = (me.vx - c.vx) * nx + (me.vy - c.vy) * ny; if (rv < 0) { me.vx -= rv * 1.3 * nx; me.vy -= rv * 1.3 * ny; } if (me.cur > 200) { pop('CONTACT! DRIFT LOST', '#ff6060'); me.cur = 0; me.combo = 1; } } }
-  if (typeof rocketTick === 'function') rocketTick(Math.min(dt, 0.05), now);
+  if (typeof rocketTick === 'function') rocketTick(Math.min(dt, 0.05), now); if (typeof bombTick === 'function') bombTick(dt, now);
   // network
-  if (G.mp && now - G.sendT > NET.rate) { G.sendT = now; const s = pack(me); if (NET.host) { const list = [['host', ...s]]; for (const [id, r] of G.rem) if (r.raw) list.push([id, ...r.raw]); netSend({ t: 'all', list }); if (G.firstFin && !G.final && now - G.firstFin > 120000) hostRes(true); } else netSend({ t: 'st', s }); }
+  if (G.mp && (!G.spec || NET.host) && now - G.sendT > NET.rate) { G.sendT = now; const s = pack(me); if (NET.host) { const list = [['host', ...s]]; for (const [id, r] of G.rem) if (r.raw) list.push([id, ...r.raw]); netSend({ t: 'all', list }); if (G.firstFin && !G.final && now - G.firstFin > 120000) hostRes(true); } else netSend({ t: 'st', s }); }
   if (bg) { sndUpdate(me, true); return; }
   effects(dt); render(dt, now); hud(now); sndUpdate(me, true);
 }
@@ -153,7 +154,7 @@ function effects(dt) {
 function raceCheckpoint() {
   const c = G.me; if (c.cpI == null) return resetCar(c);
   const i = c.cpI, p = G.tr.pts[i]; c.x = p[0]; c.y = p[1]; c.a = G.tr.dirs[i]; c.vx = c.vy = 0; c.steer = 0; c.speed = 0; c.hint = i; c.prog = i;
-  c.cur = 0; c.combo = 1; c.comboT = 0; c.drift = false; c.wrong = 0; c.rwL = c.rwR = null; pop('BACK TO CHECKPOINT', '#ffe14d');
+  c.cur = 0; c.combo = 1; c.comboT = 0; c.drift = false; c.wrong = 0; c.rwL = c.rwR = null; G.splitBad = c.lapStart; pop('BACK TO CHECKPOINT', '#ffe14d');
 }
 function ttRestart() {
   const c = G.me, s = gridSlot(G.tr, 0); c.x = s.x; c.y = s.y; c.a = s.a; c.vx = c.vy = 0; c.steer = 0; c.speed = 0; c.lap = -1; c.cps = 0; c.lapStart = 0; c.cur = 0; c.combo = 1; c.comboT = 0; c.drift = false; c.wrong = 0;
@@ -162,7 +163,7 @@ function ttRestart() {
 function ttCheckpoint() {
   const c = G.me; if (c.cpI == null) return ttRestart();
   const i = c.cpI, p = G.tr.pts[i]; c.x = p[0]; c.y = p[1]; c.a = G.tr.dirs[i]; c.vx = c.vy = 0; c.steer = 0; c.speed = 0; c.hint = i; c.prog = i; c.seg = c.seg || 0; c.ng = c.seg;
-  c.cur = 0; c.combo = 1; c.comboT = 0; c.drift = false; c.wrong = 0; c.rwL = c.rwR = null; pop('BACK TO CHECKPOINT', '#ffe14d');
+  c.cur = 0; c.combo = 1; c.comboT = 0; c.drift = false; c.wrong = 0; c.rwL = c.rwR = null; G.splitBad = c.lapStart; pop('BACK TO CHECKPOINT', '#ffe14d');
 }
 function endTT() {
   const c = G.me; bankDrift(c); G.state = 'over'; banner(''); const T = G.tt, driven = T.start ? performance.now() - T.start : 0, km = G.dist * 0.0000694;
@@ -231,9 +232,10 @@ function pbRepCloud(tr) {
   })();
 }
 // ---------- checkpoint deltas against your best lap ----------
-function splitRef() { try { const r = JSON.parse(localStorage.getItem('md_split_' + G.cfg.track) || 'null'); return r && r.n === G.tr.n && r.k === G.tr.gates.length && Array.isArray(r.s) ? r : null; } catch (e) { return null; } }
-function splitAt(j, t) { if (G.splitStart !== G.me.lapStart) { G.splitStart = G.me.lapStart; G.curSplits = []; } G.curSplits[j] = t; const r = splitRef(); if (!r || !(r.s[j] > 0)) return;
-  const b = pbBest(G.cfg.track), sc = b && r.lap > b ? b / r.lap : 1; showDelta(t - r.s[j] * sc); } // old split sets from a slower lap get scaled to your real PB
+function splitRef() { try { const r = JSON.parse(localStorage.getItem('md_split2_' + G.cfg.track) || 'null'); return r && r.n === G.tr.n && r.k === G.tr.gates.length && Array.isArray(r.s) ? r : null; } catch (e) { return null; } }
+function splitAt(j, t) { if (G.splitStart !== G.me.lapStart) { G.splitStart = G.me.lapStart; G.curSplits = []; } for (let q = 0; q < j; q++) if (!(G.curSplits[q] > 0)) G.splitBad = G.me.lapStart; // gate skipped / out of order: this lap's splits can't be compared
+  if (G.curSplits[j] > 0 || !(t > 0)) return; G.curSplits[j] = t; if (G.splitBad === G.me.lapStart) return; const r = splitRef(); if (!r || !(r.s[j] > 0)) return;
+  showDelta(t - r.s[j]); } // straight compare against the splits of your fastest clean lap
 function fullSplits(S, K) { if (!S || S.length !== K) return false; for (let j = 0; j < K; j++) if (!(S[j] > 0)) return false; return true; }
 function pbBest(tr) { const a = [rec(tr).lap, ACCT.bestLap(tr)].filter(x => x > 0); return a.length ? Math.min(...a) : 0; }
 function showDelta(d) {
@@ -243,7 +245,7 @@ function showDelta(d) {
 }
 function lapExtras(lt, rep, pb, sr) {
   const K = G.tr.gates.length, S = G.curSplits || [];
-  if (fullSplits(S, K) && (pb || !sr || lt < sr.lap)) { try { localStorage.setItem('md_split_' + G.cfg.track, JSON.stringify({ lap: Math.round(lt), s: S.map(Math.round), n: G.tr.n, k: K })); } catch (e) { } }
+  if (fullSplits(S, K) && G.splitBad !== G.splitStart && (!sr || lt < sr.lap)) { try { localStorage.setItem('md_split2_' + G.cfg.track, JSON.stringify({ lap: Math.round(lt), s: S.map(Math.round), n: G.tr.n, k: K })); } catch (e) { } }
   G.curSplits = []; G.splitStart = G.me.lapStart;
   if (pb && rep) { try { localStorage.setItem('md_rep_' + G.cfg.track, rep); localStorage.setItem('md_repms_' + G.cfg.track, String(Math.round(lt))); } catch (e) { } G.attract = null; if (PBREP[G.cfg.track]) delete PBREP[G.cfg.track]; if (G.tt && (!G.ghostCar || G.ghostCar.own)) setGhost(rep, null); }
 }

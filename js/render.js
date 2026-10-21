@@ -30,10 +30,12 @@ function render(dt) {
   try { renderInner(dt, me); } finally { me.x = rx; me.y = ry; me.a = ra; }
 }
 function renderInner(dt, me) {
+  if (G.spec && typeof specTarget === 'function') { const t = specTarget(); if (t) me = t; }
   const cam = G.cam, base = Math.min(VW, VH) / 820, zt = base * (1.08 - Math.min(1, me.speed / CAR.MAXS) * 0.32) * (1 + 0.4 * (G.tunT = (G.tunT || 0) + ((me.layer === -1 ? 1 : 0) - (G.tunT || 0)) * Math.min(1, dt * 3))), k = 1 - Math.exp(-dt * 6);
   cam.z += (zt - cam.z) * (1 - Math.exp(-dt * 2)); cam.x += (me.x + me.vx * 0.3 - cam.x) * k; cam.y += (me.y + me.vy * 0.3 - cam.y) * k;
   if (G.rot) cam.a += angDiff(-me.a - Math.PI / 2, cam.a) * (1 - Math.exp(-dt * 4));
-  const tn = performance.now(); drawWorld(G.tr, cam, [...ghostCars(), ...[...G.rem.values()].map(r => r.car).filter(c => !(c.deadUntil > tn)), ...(me.dead ? [] : [me])], G.rot);
+  const tn = performance.now(); drawWorld(G.tr, cam, [...ghostCars(), ...[...G.rem.values()].map(r => r.car).filter(c => !(c.deadUntil > tn)), ...(G.me.dead || G.spec ? [] : [G.me])], G.rot);
+  if (typeof bombDraw === 'function') bombDraw();
   drawMini();
   if (CFG.gfx.fps) { G.fps = (G.fps || 60) * 0.94 + (1 / Math.max(dt, 1e-3)) * 0.06; ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.font = '700 12px monospace'; ctx.textAlign = 'left'; ctx.fillStyle = 'rgba(255,255,255,.85)'; ctx.fillText(Math.round(G.fps) + ' FPS', 14, VH - 14); }
 }
@@ -74,7 +76,7 @@ function drawMini() {
   const m = $('mini').getContext('2d'); m.clearRect(0, 0, 220, 160); m.drawImage(MINI.c, 0, 0);
   const p0 = G.tr.pts[0]; m.fillStyle = '#fff'; m.fillRect(10 + p0[0] * MINI.s - 3, 10 + p0[1] * MINI.s - 3, 6, 6);
   if (CFG.gfx.gates && G.tr.gates) { const nx = nextGate(G.me) + 1, gp = G.me.gp || []; for (const g of G.tr.gates) { const p = G.tr.pts[g.i]; m.fillStyle = G.me.lap >= 0 && gp[g.s - 1] ? 'rgba(120,120,128,.55)' : g.s === nx && G.me.lap >= 0 ? '#ffd400' : 'rgba(255,42,42,.9)'; m.beginPath(); m.arc(10 + p[0] * MINI.s, 10 + p[1] * MINI.s, 3.2, 0, 7); m.fill(); } }
-  for (const c of [...[...G.rem.values()].map(r => r.car), G.me]) { m.fillStyle = c.color; m.strokeStyle = c === G.me ? '#fff' : '#000'; m.lineWidth = 2; m.beginPath(); m.arc(10 + c.x * MINI.s, 10 + c.y * MINI.s, c === G.me ? 6 : 5, 0, 7); m.fill(); m.stroke(); }
+  for (const c of [...[...G.rem.values()].map(r => r.car).filter(c => !(c.deadUntil > performance.now() + 60000)), ...(G.spec ? [] : [G.me])]) { m.fillStyle = c.color; m.strokeStyle = c === G.me ? '#fff' : '#000'; m.lineWidth = 2; m.beginPath(); m.arc(10 + c.x * MINI.s, 10 + c.y * MINI.s, c === G.me ? 6 : 5, 0, 7); m.fill(); m.stroke(); }
 }
 function renderAttract(dt) {
   if (!G.attract || G.attract.idx !== CFG.track) {

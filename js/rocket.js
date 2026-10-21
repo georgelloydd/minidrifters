@@ -14,7 +14,7 @@ G.rk = []; G.boom = [];
   const h = document.createElement('div'); h.id = 'rkHud'; h.innerHTML = '🚀 ROCKET · <span id="rkKey">X</span><i><u id="rkBar"></u></i>'; document.body.appendChild(h);
 })();
 
-function rkAllowed() { return !!(typeof TWEAKS !== 'undefined' && TWEAKS.rl); }
+function rkAllowed() { if (G.spec) return false; return !!((typeof TWEAKS !== 'undefined' && TWEAKS.rl) || (G.cfg && G.cfg.pvp && G.mp && !G.tt)); }
 function rkReset() { G.rk = []; G.boom = []; if (G.me) { G.me.dead = 0; G.me.shield = 0; G.me.rkReady = 0; } const d = $('deathScr'); if (d) d.style.display = 'none'; const h = $('rkHud'); if (h) h.style.display = 'none'; }
 function rkName(id) { if (id === myId()) return CFG.name; const r = G.rem.get(id); return r ? r.car.name : 'Driver'; }
 function rkColor(id) { if (id === myId()) return CFG.color; const r = G.rem.get(id); return r ? r.car.color : '#ff8c1a'; }
@@ -40,7 +40,7 @@ function rocketFire() {
 }
 function boomFx(x, y, col) {
   const sp = []; for (let i = 0; i < 16; i++) { const a = Math.random() * 6.283, v = 120 + Math.random() * 380; sp.push([Math.cos(a) * v, Math.sin(a) * v, 2 + Math.random() * 3]); }
-  G.boom.push({ x, y, t: 0, max: 0.95, col: col || '#ff8c1a', sp }); if (G.boom.length > 12) G.boom.shift();
+  G.boom.push({ x, y, t: 0, max: 0.95, col: col || '#ff8c1a', sp, id: (G.boomN = (G.boomN || 0) + 1) }); if (G.boom.length > 12) G.boom.shift();
   sndBurst(0.9, 260, 0.9); sndBurst(0.5, 1400, 0.4); sndClank(900);
 }
 function segDist(px, py, ax, ay, bx, by) { const dx = bx - ax, dy = by - ay, l = dx * dx + dy * dy, t = l ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / l)) : 0; return Math.hypot(px - (ax + dx * t), py - (ay + dy * t)); }
@@ -54,13 +54,13 @@ function rocketHit(r) {
 }
 function rocketRespawn() {
   const me = G.me; me.dead = 0; me.shield = performance.now() + RK.SHIELD * 1000; $('deathScr').style.display = 'none';
-  if (G.tt) ttCheckpoint(); else raceCheckpoint();
+  if (G.tt) ttCheckpoint(); else raceCheckpoint(); G.splitBad = me.lapStart;
 }
 // called every frame from the game loop
 function rocketTick(dt, now) {
   const me = G.me, live = G.state === 'race' || G.state === 'countdown' || G.state === 'over';
   const hud = $('rkHud'); if (!live || !me) { if (hud) hud.style.display = 'none'; return; }
-  const ok = rkAllowed(); if (ok && !G.rlSeen) { G.rlSeen = true; pop('🚀 ROCKET LAUNCHER · ' + (TWEAKS.raf ? 'hold ' : 'press ') + keyName(CFG.keys.rocket), '#ffb020'); } if (!ok) G.rlSeen = false;
+  const ok = rkAllowed(); if (ok && !G.rlSeen) { G.rlSeen = true; pop('🚀 ' + (G.cfg && G.cfg.pvp ? 'PVP ON · ' : 'ROCKET LAUNCHER · ') + (TWEAKS.raf ? 'hold ' : 'press ') + keyName(CFG.keys.rocket), '#ffb020'); } if (!ok) G.rlSeen = false;
   if (ok && TWEAKS.raf && G.state === 'race' && !me.dead && !me.finished && KEYS[CFG.keys.rocket]) { G.rkAcc = Math.min(8, (G.rkAcc || 0) + dt * RK.AUTO); while (G.rkAcc >= 1) { G.rkAcc--; rocketShoot(true); } } else G.rkAcc = 0;
   rkFlush(false);
   hud.style.display = ok && G.state === 'race' ? 'block' : 'none';

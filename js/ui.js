@@ -1,7 +1,7 @@
 // ===== Menus, lobby, input, network wiring =====
-emitCfg = () => ({ track: CFG.track, laps: CFG.laps, mode: CFG.mode, wx: CFG.wx || 'auto' });
+emitCfg = () => ({ track: CFG.track, laps: CFG.laps, mode: CFG.mode, wx: CFG.wx || 'auto', pvp: !!CFG.pvp });
 const WXN = { auto: 'Track default', clear: 'Clear', rain: 'Rain', night: 'Night', storm: 'Night + rain', snow: 'Snow' };
-const MODES = { race: 'Race (fastest)', drift: 'Drift battle', tandem: 'Tandem drift', tt: 'Race (fastest)' };
+const MODES = { race: 'Race (fastest)', drift: 'Drift battle', tandem: 'Tandem drift', bomb: '💣 Bomb tag', tt: 'Race (fastest)' };
 function msg(id, t) { if (id === 'joinMsg') id = { mp: 'joinMsg' }[TAB] || 'ttMsg'; $(id).textContent = t || ''; }
 function refreshMenu() {
   if (typeof shopFix === 'function') shopFix();
@@ -65,7 +65,7 @@ function renderServers(list) {
   const box = $('servers');
   if (list === null) { $('srvMode').textContent = srvOn() ? '' : '· Wi-Fi'; box.innerHTML = '<p class="hint">' + (netAvailable() ? 'Ask the host for their 5-letter code and type it above. (With Supabase set up, open rooms also show here.)' : esc(netNeedText())) + '</p>'; return; }
   $('srvMode').textContent = '· ' + list.length + ' open';
-  box.innerHTML = list.length ? list.map(v => `<div class="srv"><b>${esc(v.host)}</b><span>${esc((TRACKS[v.track] || {}).name || '')} · ${esc(String(v.mode || '').toUpperCase())}${v.laps ? ' · ' + v.laps + ' laps' : ''}</span><span>${v.players} driver${v.players === 1 ? '' : 's'}</span>${v.inRace ? '<em>RACING</em>' : `<button class="btn dark sm" data-code="${esc(v.code)}">Join</button>`}</div>`).join('') : '<p class="hint">No open rooms right now. Create one in Host Room and it will show up here.</p>';
+  box.innerHTML = list.length ? list.map(v => `<div class="srv"><b>${esc(v.host)}</b><span>${esc((TRACKS[v.track] || {}).name || '')} · ${esc(String(v.mode || '').toUpperCase())}${v.laps ? ' · ' + v.laps + ' laps' : ''}</span><span>${v.players} driver${v.players === 1 ? '' : 's'}</span>${v.inRace ? `<em>RACING</em><button class="btn dark sm" data-code="${esc(v.code)}">👁 Spectate</button>` : `<button class="btn dark sm" data-code="${esc(v.code)}">Join</button>`}</div>`).join('') : '<p class="hint">No open rooms right now. Create one in Host Room and it will show up here.</p>';
   box.querySelectorAll('[data-code]').forEach(b => b.onclick = () => { if (G.state !== 'menu') return; $('codeIn').value = b.dataset.code; $('bJoin').click(); });
 }
 function buildMenu() {
@@ -142,18 +142,20 @@ function showLobby(d) {
     const tOpts = TRACKS.map((t, i) => t.test || t.hidden ? '' : `<option value="${i}"${i === c.track ? ' selected' : ''}>${esc(t.name)}</option>`).join('');
     $('lobbyCfg').innerHTML = `<b>Race settings</b> <span class="dim">· everyone sees changes straight away</span>
       <label>Track</label><select id="lcT">${tOpts}</select>
-      <label>Mode</label><div class="row">${['race', 'drift', 'tandem'].map(m => `<button class="opt${c.mode === m ? ' on' : ''}" data-lm="${m}">${MODES[m]}</button>`).join('')}</div>
-      <label>Laps</label><div class="row">${[1, 3, 5, 10, 0].map(l => `<button class="opt${c.laps === l ? ' on' : ''}" data-ll="${l}">${l ? l : 'Free roam'}</button>`).join('')}</div>
-      <label>Weather &amp; time</label><div class="row wrap">${Object.keys(WXN).map(w => `<button class="opt${(c.wx || 'auto') === w ? ' on' : ''}" data-lw="${w}">${WXN[w]}</button>`).join('')}</div>${c.mode === 'tandem' ? '<p class="hint">Tandem: drift close behind (or ahead of) another driver for double drift points.</p>' : ''}`;
+      <label>Mode</label><div class="row">${['race', 'drift', 'tandem', 'bomb'].map(m => `<button class="opt${c.mode === m ? ' on' : ''}" data-lm="${m}">${MODES[m]}</button>`).join('')}</div>
+      <label>PvP rockets</label><div class="row">${[[0, 'Off'], [1, '🚀 On']].map(([v, n]) => `<button class="opt${!!c.pvp === !!v ? ' on' : ''}" data-lp="${v}">${n}</button>`).join('')}</div>
+      ${c.mode === 'bomb' ? '' : `<label>Laps</label>`}<div class="row"${c.mode === 'bomb' ? ' style="display:none"' : ''}>${[1, 3, 5, 10, 0].map(l => `<button class="opt${c.laps === l ? ' on' : ''}" data-ll="${l}">${l ? l : 'Free roam'}</button>`).join('')}</div>
+      <label>Weather &amp; time</label><div class="row wrap">${Object.keys(WXN).map(w => `<button class="opt${(c.wx || 'auto') === w ? ' on' : ''}" data-lw="${w}">${WXN[w]}</button>`).join('')}</div>${c.mode === 'bomb' ? '<p class="hint">Bomb tag: one driver gets a bomb with a fuse. Touch another car to pass it on. When the fuse runs out, the holder blows up. Last one left wins.</p>' : ''}${c.pvp ? '<p class="hint">PvP: everyone gets a rocket launcher (' + esc(keyName(CFG.keys.rocket)) + '). A hit knocks a driver out for a few seconds.</p>' : ''}${c.mode === 'tandem' ? '<p class="hint">Tandem: drift close behind (or ahead of) another driver for double drift points.</p>' : ''}`;
     $('lobbyCfg').querySelectorAll('[data-lw]').forEach(b => b.onclick = () => { CFG.wx = b.dataset.lw; saveCfg(); netLobby(); });
     $('lcT').onchange = () => { CFG.track = +$('lcT').value; saveCfg(); netLobby(); };
     $('lobbyCfg').querySelectorAll('[data-lm]').forEach(b => b.onclick = () => { CFG.mode = b.dataset.lm; saveCfg(); netLobby(); });
+    $('lobbyCfg').querySelectorAll('[data-lp]').forEach(b => b.onclick = () => { CFG.pvp = b.dataset.lp === '1'; saveCfg(); netLobby(); });
     $('lobbyCfg').querySelectorAll('[data-ll]').forEach(b => b.onclick = () => { CFG.laps = +b.dataset.ll; saveCfg(); netLobby(); });
     $('pubRow').classList.remove('hidden');
     $('bStart').classList.remove('hidden'); $('bStart').textContent = G.plist.length > 1 ? `Start race (${G.plist.length} drivers)` : 'Start (waiting for friends…)';
     msg('lobbyMsg', G.plist.length > 1 ? '' : 'Share the code above. You can also start alone to test.');
   } else {
-    $('pubRow').classList.add('hidden'); $('lobbyCfg').innerHTML = c.track !== undefined ? '<b>Race settings</b> <span class="dim">· the host picks these</span><div class="ro">' + esc( `Track: ${TRACKS[c.track].name} • ${c.laps ? c.laps + ' laps' : 'Free roam'} • ${MODES[c.mode]}${c.wx && c.wx !== 'auto' ? ' • ' + (WXN[c.wx] || '') : ''}`) + '</div>' : '';
+    $('pubRow').classList.add('hidden'); $('lobbyCfg').innerHTML = c.track !== undefined ? '<b>Race settings</b> <span class="dim">· the host picks these</span><div class="ro">' + esc( `Track: ${TRACKS[c.track].name} • ${c.mode === 'bomb' ? '' : (c.laps ? c.laps + ' laps' : 'Free roam') + ' • '}${MODES[c.mode] || c.mode}${c.pvp ? ' • 🚀 PvP rockets' : ''}${c.wx && c.wx !== 'auto' ? ' • ' + (WXN[c.wx] || '') : ''}`) + '</div>' : '';
     $('bStart').classList.add('hidden'); $('lobbyHint').textContent = 'You are in the room. The host starts the race.'; if (G.plist.length) msg('lobbyMsg', 'Waiting for the host to start…');
     if (c.track !== undefined && G.attract && G.attract.idx !== c.track) CFG.track = c.track;
   }

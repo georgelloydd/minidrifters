@@ -86,6 +86,9 @@ function onMsg(t, p) {
   push(t, 'me', now, p.me[0], p.me[1], p.me[2], p.me[6], p.me[7], p.me[5]);
   const seen = new Set(['me']);
   for (const r of p.rem || []) { const id = 'r' + r[0]; seen.add(id); if (r[7]) t.look.set(id, lookOf(r[7], r[6])); push(t, id, now, r[1], r[2], r[3], r[4], r[5], 0); }
+  t.rk = (p.rk || []).map(r => ({ x: r[0], y: r[1], vx: r[2], vy: r[3], col: r[4], at: now })); if (!t.bm) t.bm = []; if (!t.bmSeen) t.bmSeen = new Set();
+  for (const b of p.bm || []) if (b[0] && !t.bmSeen.has(b[0])) { t.bmSeen.add(b[0]); t.bm.push({ x: b[1], y: b[2], st: now - b[3], col: b[4] }); if (t.bmSeen.size > 200) t.bmSeen = new Set([...t.bmSeen].slice(-100)); }
+  t.bh = p.bh || ''; t.bEnd = p.bh ? now + (p.bl || 0) : 0;
   if (p.gh) { seen.add('ghost'); push(t, 'ghost', now, p.gh[0], p.gh[1], p.gh[2], 0, 0, 0); }
   for (const id of [...t.buf.keys()]) if (!seen.has(id)) t.buf.delete(id);
 }
@@ -149,6 +152,7 @@ function drawTile(t, now, dt) {
   const dc = c => { try { if (c.id === 'ghost' || c.fin) drawGhost(g, c); else drawCar(g, c, night); } catch (e) { } };
   for (const c of order) { if (c.layer === 1) hi.push(c); else dc(c); }
   try { drawTunnelRoof(g, tr, 0.9); drawBridges(g, tr); } catch (e) { } hi.forEach(dc);
+  try { drawRkFx(g, t, rt, now, cars); } catch (e) { }
   g.restore();
   // name tags
   g.font = '700 13px Segoe UI, system-ui, sans-serif'; g.textAlign = 'center';
@@ -156,6 +160,19 @@ function drawTile(t, now, dt) {
     g.fillStyle = c.id === 'me' ? 'rgba(255,42,42,.85)' : 'rgba(0,0,0,.55)'; g.beginPath(); g.roundRect(x - w / 2, y - 52, w, 20, 8); g.fill(); g.fillStyle = '#fff'; g.fillText(c.name, x, y - 37); }
   const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.45, W / 2, H / 2, Math.hypot(W, H) * 0.6); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.35)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   drawMini(t, cars); hudOf(t, p);
+}
+function drawRkFx(g, t, rt, now, cars) {
+  for (const r of t.rk || []) { const s = Math.max(-0.3, Math.min(0.4, (rt - r.at) / 1000)), x = r.x + r.vx * s, y = r.y + r.vy * s, a = Math.atan2(r.vy, r.vx), ca = Math.cos(a), sa = Math.sin(a);
+    g.strokeStyle = 'rgba(255,190,90,.55)'; g.lineWidth = 6; g.lineCap = 'round'; g.beginPath(); g.moveTo(x - ca * 46, y - sa * 46); g.lineTo(x, y); g.stroke();
+    g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = '#ddd'; g.fillRect(-14, -4, 22, 8); g.fillStyle = r.col; g.beginPath(); g.moveTo(8, -4); g.lineTo(16, 0); g.lineTo(8, 4); g.fill(); g.fillStyle = '#ffd24d'; g.beginPath(); g.arc(-16, 0, 4 + Math.random() * 3, 0, 7); g.fill(); g.restore(); }
+  t.bm = (t.bm || []).filter(b => rt - b.st < 950);
+  for (const b of t.bm) { if (rt < b.st) continue; const k = (rt - b.st) / 950, R = 30 + 140 * Math.sqrt(k);
+    g.globalAlpha = (1 - k) * 0.9; const gr = g.createRadialGradient(b.x, b.y, 0, b.x, b.y, R); gr.addColorStop(0, '#fff6c0'); gr.addColorStop(0.35, '#ffb020'); gr.addColorStop(0.7, b.col); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(b.x, b.y, R, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(255,255,255,' + (1 - k) * 0.7 + ')'; g.lineWidth = 4; g.beginPath(); g.arc(b.x, b.y, R * 1.2, 0, 7); g.stroke(); g.globalAlpha = 1; }
+  if (t.bh) { const c = cars.find(q => q.id === t.bh); if (c) { const left = Math.max(0, (t.bEnd - now) / 1000), pu = 0.5 + 0.5 * Math.sin(now / 1000 * (left < 5 ? 10 : 4) * Math.PI);
+    g.strokeStyle = 'rgba(255,' + Math.round(60 + 100 * pu) + ',40,.85)'; g.lineWidth = 4; g.beginPath(); g.arc(c.x, c.y, 48 + 6 * pu, 0, 7); g.stroke();
+    g.fillStyle = '#16161a'; g.beginPath(); g.arc(c.x, c.y - 70, 15, 0, 7); g.fill(); g.fillStyle = pu > 0.5 ? '#ffe14d' : '#ff6a00'; g.beginPath(); g.arc(c.x + 18, c.y - 86, 4 + 2 * pu, 0, 7); g.fill();
+    g.font = '900 18px Segoe UI, system-ui, sans-serif'; g.textAlign = 'center'; g.fillStyle = left < 5 ? '#ff4040' : '#fff'; g.fillText(left.toFixed(1) + 's', c.x, c.y - 40); } }
 }
 function drawMini(t, cars) {
   const tr = t.tr, m = t.mini.getContext('2d'); t.mini.style.display = ''; const S = 2;

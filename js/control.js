@@ -44,7 +44,7 @@ function wtTick() {
   const me = G.me, full = (WT.n++ % 8) === 0, cfg = G.cfg || {};
   const lapT = G.tt ? (st === 'race' && me.lap >= 0 ? now - me.lapStart : 0) : me.finished || (st === 'race' ? now - G.t0 : 0);
   let pos = 0, cnt = 1; if (G.rem.size && typeof posOf === 'function') { const all = [me, ...[...G.rem.values()].map(r => r.car)], m = posOf(me); cnt = all.length; pos = 1 + all.filter(c => c !== me && posOf(c) > m).length; }
-  const fl = c => (c.drift ? 1 : 0) | (c.brake ? 2 : 0) | (c.hb ? 4 : 0) | (c.dead ? 8 : 0) | (c.finished ? 16 : 0);
+  const fl = c => (c.drift ? 1 : 0) | (c.brake ? 2 : 0) | (c.hb ? 4 : 0) | (c.dead || c.deadUntil > now || (c === G.me && G.spec) ? 8 : 0) | (c.finished ? 16 : 0);
   const rem = [...G.rem.entries()].map(([id, r]) => { const c = r.car, o = [String(id), Math.round(c.x), Math.round(c.y), +c.a.toFixed(3), fl(c), c.layer || 0]; if (full) o.push(c.name || 'Driver', wtLook(c)); return o; });
   const gh = G.ghostCar && typeof ghostCars === 'function' ? ghostCars()[0] : null;
   const p = { k: 'pos', s: st, key: wtKey(G.tr), mode: cfg.mode || '', laps: cfg.laps || 0, tt: G.tt ? G.tt.laps + 1 : 0,
@@ -52,6 +52,10 @@ function wtTick() {
     lap: me.lap, lapT: Math.round(lapT), best: me.best || 0, last: me.lastLap || 0, score: Math.round(me.score || 0), cur: Math.round(me.cur || 0), combo: me.combo || 1, wrong: me.wrong > 1 ? 1 : 0, pos, cnt, rem,
     cd: st === 'countdown' ? Math.max(0, Math.ceil((G.cdEnd - now) / 1000)) : 0, wx: G.wx || 'auto', t: Date.now() };
   if (gh) p.gh = [Math.round(gh.x), Math.round(gh.y), +gh.a.toFixed(3)];
+  if (G.rk && G.rk.length) p.rk = G.rk.slice(-60).map(r => [Math.round(r.x), Math.round(r.y), Math.round(r.vx), Math.round(r.vy), r.color || '#ff8c1a']);
+  if (G.boom && G.boom.length) p.bm = G.boom.map(b => [b.id || 0, Math.round(b.x), Math.round(b.y), Math.round(b.t * 1000), b.col || '#ff8c1a']);
+  const BC = G.bombC; if (BC && BC.h && cfg.mode === 'bomb') { p.bh = BC.h === myId() ? 'me' : 'r' + BC.h; p.bl = Math.max(0, Math.round(BC.end - now)); }
+  if (G.spec) p.spec = 1;
   if (full) { p.name = CFG.name; p.look = wtLook(G.me); }
   wtSend('watch', p);
 }

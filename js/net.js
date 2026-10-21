@@ -43,12 +43,12 @@ function netJoin(code, me, cb) {
 function hostData(c, d) {
   if (!d || typeof d !== 'object') return;
   if (d.t === 'hello') {
-    if (NET.inRace) { c.send({ t: 'busy', msg: 'A race is in progress. Try again when it finishes.' }); setTimeout(() => c.close(), 500); return; }
     if (NET.players.size >= MAX_GRID && !NET.players.has(c.peer)) { c.send({ t: 'busy', msg: 'This lobby is full (' + MAX_GRID + ' drivers max).' }); setTimeout(() => c.close(), 500); return; }
     const pid = String(d.pid || '').slice(0, 40);
     if (pid && (pid === myPid() || [...NET.players.values()].some(p => p.pid === pid && p.id !== c.peer))) { c.send({ t: 'busy', msg: 'You are already in this lobby in another tab or window.' }); setTimeout(() => c.close(), 500); return; }
     NET.conns.set(c.peer, c); NET.players.set(c.peer, Object.assign({ id: c.peer, name: String(d.name || 'Driver').slice(0, 14), pid }, carLook(d)));
-    c.send({ t: 'welcome', id: c.peer }); emit('joined', c.peer); netLobby();
+    c.send({ t: 'welcome', id: c.peer }); emit('joined', c.peer);
+    if (NET.inRace && G.cfg && G.me) { const pl = [...NET.players.values()].map(p => Object.assign({}, p)); pl.forEach(p => { if (p.id === 'host') Object.assign(p, carLook(CFG), { name: CFG.name }); }); c.send({ t: 'spec', cfg: G.cfg, grid: ['host', ...G.rem.keys()], rid: G.rid, plist: pl }); } else netLobby();
   } else if (!NET.players.has(c.peer)) return;
   else if (d.t === 'st') { const p = NET.players.get(c.peer); p.s = d.s; emit('st', { id: c.peer, s: d.s }); }
   else if (d.t === 'fin') { emit('fin', { id: c.peer, time: d.time, score: d.score, laps: d.laps, rid: d.rid }); }
