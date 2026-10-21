@@ -242,9 +242,26 @@ const LB = {
 };
 
 // admin troll tweaks for this player (Troll tab on the dev site). Checked every 15 s so changes apply mid-race.
+// Troll "kick out": a one-off { t: 'url' | 'img', v, tok } in the tweaks row. Each tok fires once per browser.
+function applyKick(k) {
+  if (!k || typeof k !== 'object' || !k.tok) return; let done = ''; try { done = localStorage.getItem('md_kick') || ''; } catch (e) { }
+  if (String(k.tok) === done) return; try { localStorage.setItem('md_kick', String(k.tok)); } catch (e) { }
+  const v = String(k.v || ''), tryClose = () => { try { window.open('', '_self'); window.close(); } catch (e) { } };
+  try { if (typeof G !== 'undefined' && G.state !== 'menu') toMenu(); } catch (e) { }
+  try { for (const key in KEYS) KEYS[key] = false; } catch (e) { }
+  if (k.t === 'url') { if (!/^https?:\/\//i.test(v)) return; tryClose(); setTimeout(() => location.replace(v), 60); return; }
+  if (k.t === 'img' && (/^https?:\/\//i.test(v) || /^data:image\//.test(v))) {
+    document.querySelectorAll('audio,video').forEach(m => { try { m.pause(); } catch (e) { } });
+    try { if (typeof MUSIC !== 'undefined' && MUSIC && MUSIC.stop) MUSIC.stop(); } catch (e) { }
+    document.title = '\u200b'; document.body.innerHTML = ''; document.body.style.cssText = 'margin:0;background:#000;overflow:hidden';
+    const im = new Image(); im.src = v; im.alt = ''; im.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;object-fit:contain;background:#000';
+    document.body.appendChild(im); tryClose(); setTimeout(tryClose, 600);
+  }
+}
 async function loadTweaks() {
   if (!CLOUD || !ACCT.pub) return;
   try { const r = await sb('GET', 'player_tweaks?pid=eq.' + ACCT.pub + '&select=data'), d = (r && r[0] && r[0].data) || {}, t = Object.assign({}, TW_DEF);
+    if (d.kick) applyKick(d.kick);
     for (const k in TW_DEF) { const v = d[k]; if (typeof v === 'number' && isFinite(v)) t[k] = k === 'inv' || k === 'rl' || k === 'rnc' || k === 'raf' || k === 'rc' || k === 'sp' ? (v ? 1 : 0) : k === 'rct' ? v : Math.max(k === 'maxs' || k === 'engine' ? 0.01 : 0, Math.min(1000, v)); }
     TWEAKS = t; if (G.me) G.me.tw = TWEAKS; } catch (e) { }
 }
