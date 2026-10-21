@@ -5,7 +5,7 @@ const MODES = { race: 'Race (fastest)', drift: 'Drift battle', tandem: 'Tandem d
 function msg(id, t) { if (id === 'joinMsg') id = { mp: 'joinMsg' }[TAB] || 'ttMsg'; $(id).textContent = t || ''; }
 function refreshMenu() {
   if (typeof shopFix === 'function') shopFix();
-  if (CFG.mode !== 'race' && CFG.mode !== 'drift' && CFG.mode !== 'tandem') CFG.mode = 'race'; // host-room mode; time trial has its own tab
+  if (CFG.mode !== 'race' && CFG.mode !== 'drift' && CFG.mode !== 'tandem' && CFG.mode !== 'bomb') CFG.mode = 'race'; // host-room mode; time trial has its own tab
   document.querySelectorAll('.prow').forEach(r => { const f = r.dataset.f, v = CFG[f]; r.querySelectorAll('.sw').forEach(s => s.classList.toggle('on', s.dataset.c.toLowerCase() === String(v).toLowerCase())); const ci = r.querySelector('input[type=color]'), hi = r.querySelector('.hex'); ci.value = v; if (document.activeElement !== hi) { hi.value = v.toUpperCase(); hi.classList.remove('bad'); } });
   document.querySelectorAll('[data-fin]').forEach(s => s.classList.toggle('on', s.dataset.fin === CFG.finish)); if (document.activeElement !== $('numIn')) $('numIn').value = CFG.num;
   document.querySelectorAll('.lvt').forEach(s => { s.classList.toggle('on', s.dataset.lv === CFG.livery); drawCarPreview(s.querySelector('canvas'), Object.assign(carLook(CFG), { livery: s.dataset.lv }), -0.35); });

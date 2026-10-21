@@ -144,6 +144,7 @@ function drawTile(t, now, dt) {
   g.fillStyle = 'rgba(15,15,18,.28)'; for (const q of t.skid) { g.beginPath(); g.arc(q[0], q[1], 3.5, 0, 7); g.fill(); }
   if (night && sw > 0) { g.fillStyle = 'rgba(4,6,22,.55)'; g.fillRect(sx, sy, sw, sh); }
   try { drawWalls(g, tr); drawTunnelFloor(g, tr); } catch (e) { }
+  try { drawSpecGates(g, tr); } catch (e) { }
   // smoke
   for (const c of cars) if (c.drift && c.id !== 'ghost' && Math.random() < 0.7) t.smoke.push({ x: c.x - Math.cos(c.a) * 22 + (Math.random() - 0.5) * 16, y: c.y - Math.sin(c.a) * 22 + (Math.random() - 0.5) * 16, r: 10, life: 0, max: 0.9 });
   for (const s of t.smoke) { s.life += dt; s.r += dt * 30; } t.smoke = t.smoke.filter(s => s.life < s.max).slice(-220);
@@ -161,6 +162,11 @@ function drawTile(t, now, dt) {
   const vg = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.45, W / 2, H / 2, Math.hypot(W, H) * 0.6); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,.35)'); g.fillStyle = vg; g.fillRect(0, 0, W, H);
   drawMini(t, cars); hudOf(t, p);
 }
+function drawSpecGates(g, tr) {
+  if (!tr.gates) return;
+  for (const q of tr.gates) { const p = tr.pts[q.i], a = tr.dirs[q.i], px = -Math.sin(a), py = Math.cos(a), fx = Math.cos(a), fy = Math.sin(a);
+    for (const sd of [-1, 1]) { const ro = gateW(tr, q, sd); drawTyreRow(g, p[0] + px * ro * sd, p[1] + py * ro * sd, fx, fy, '#ffd400'); } }
+}
 function drawRkFx(g, t, rt, now, cars) {
   for (const r of t.rk || []) { const s = Math.max(-0.3, Math.min(0.4, (rt - r.at) / 1000)), x = r.x + r.vx * s, y = r.y + r.vy * s, a = Math.atan2(r.vy, r.vx), ca = Math.cos(a), sa = Math.sin(a);
     g.lineCap = 'round'; for (let k = 0; k < 3; k++) { g.strokeStyle = 'rgba(205,205,215,' + (0.2 - k * 0.055) + ')'; g.lineWidth = 7 + k * 6; g.beginPath(); g.moveTo(x - ca * 22, y - sa * 22); g.lineTo(x - ca * (80 + k * 45), y - sa * (80 + k * 45)); g.stroke(); }
@@ -177,7 +183,7 @@ function drawRkFx(g, t, rt, now, cars) {
 function drawMini(t, cars) {
   const tr = t.tr, m = t.mini.getContext('2d'); t.mini.style.display = ''; const S = 2;
   if (t.miniKey !== t.key) { t.miniKey = t.key; const c = t.miniC = document.createElement('canvas'); c.width = 352; c.height = 256; const g = c.getContext('2d'), s = Math.min(320 / (tr.W || WORLD_W), 224 / (tr.H || WORLD_H)); g.translate(16, 16); g.scale(s, s); g.lineJoin = 'round'; pathTrack(g, tr); g.strokeStyle = 'rgba(255,255,255,.25)'; g.lineWidth = Math.max(tr.w + 60, 14 / s); g.stroke(); g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = Math.max(tr.w * 0.55, 6 / s); g.stroke(); t.miniS = s; }
-  m.clearRect(0, 0, 352, 256); m.drawImage(t.miniC, 0, 0); const s = t.miniS, p0 = tr.pts[0]; m.fillStyle = '#fff'; m.fillRect(16 + p0[0] * s - 5, 16 + p0[1] * s - 5, 10, 10);
+  m.clearRect(0, 0, 352, 256); m.drawImage(t.miniC, 0, 0); const s = t.miniS, p0 = tr.pts[0]; m.fillStyle = '#fff'; m.fillRect(16 + p0[0] * s - 5, 16 + p0[1] * s - 5, 10, 10); if (tr.gates) { m.fillStyle = '#ffd400'; for (const q of tr.gates) { const gp = tr.pts[q.i]; m.beginPath(); m.arc(16 + gp[0] * s, 16 + gp[1] * s, 4, 0, 7); m.fill(); } }
   for (const c of cars) { if (c.id === 'ghost') continue; m.fillStyle = c.color || '#888'; m.strokeStyle = c.id === 'me' ? '#fff' : '#000'; m.lineWidth = 3; m.beginPath(); m.arc(16 + c.x * s, 16 + c.y * s, c.id === 'me' ? 11 : 8, 0, 7); m.fill(); m.stroke(); }
 }
 function hudOf(t, p) {
