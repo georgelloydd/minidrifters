@@ -40,11 +40,12 @@ function wtSig(p) {
 function wtTick() {
   if (!RC.on || performance.now() - WT.at > 6000) return;
   const now = performance.now(), st = G.state, inRace = st !== 'menu' && st !== 'lobby' && G.me && G.tr;
-  if (!inRace) return wtSend('watch', { k: 'pos', s: st });
+  if (!inRace) { WT.sk = ''; return wtSend('watch', { k: 'pos', s: st }); }
   const me = G.me, full = (WT.n++ % 8) === 0, cfg = G.cfg || {};
+  const k0 = wtKey(G.tr); if (k0 !== WT.sk) { WT.sk = k0; WT.trkAt = now; wtSend('watch', { k: 'trk', key: k0, def: G.tr.def }); } // send the track as soon as a new race / time trial starts
   const lapT = G.tt ? (st === 'race' && me.lap >= 0 ? now - me.lapStart : 0) : me.finished || (st === 'race' ? now - G.t0 : 0);
   let pos = 0, cnt = 1; if (G.rem.size && typeof posOf === 'function') { const all = [me, ...[...G.rem.values()].map(r => r.car)], m = posOf(me); cnt = all.length; pos = 1 + all.filter(c => c !== me && posOf(c) > m).length; }
-  const fl = c => (c.drift ? 1 : 0) | (c.brake ? 2 : 0) | (c.hb ? 4 : 0) | (c.dead || c.deadUntil > now || (c === G.me && G.spec) ? 8 : 0) | (c.finished ? 16 : 0);
+  const fl = c => (c.drift ? 1 : 0) | (c.brake ? 2 : 0) | (c.hb ? 4 : 0) | (c.dead || c.deadUntil > now || (c === G.me && G.spec) ? 8 : 0) | (c.finished ? 16 : 0) | (typeof rkCarOn === 'function' && rkCarOn(c) ? 32 : 0);
   const rem = [...G.rem.entries()].map(([id, r]) => { const c = r.car, o = [String(id), Math.round(c.x), Math.round(c.y), +c.a.toFixed(3), fl(c), c.layer || 0]; if (full) o.push(c.name || 'Driver', wtLook(c)); return o; });
   const gh = G.ghostCar && typeof ghostCars === 'function' ? ghostCars()[0] : null;
   const p = { k: 'pos', s: st, key: wtKey(G.tr), mode: cfg.mode || '', laps: cfg.laps || 0, tt: G.tt ? G.tt.laps + 1 : 0,

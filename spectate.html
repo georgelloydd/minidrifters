@@ -125,9 +125,9 @@ function drawTile(t, now, dt) {
   else if (!tr) msg = 'Loading their track…';
   t.st.classList.toggle('hide', !msg); if (msg && t.st._m !== msg) { t.st._m = msg; t.st.innerHTML = msg; }
   g.setTransform(d, 0, 0, d, 0, 0);
-  if (!tr) { g.fillStyle = '#0b0b0e'; g.fillRect(0, 0, W, H); t.hud.innerHTML = ''; t.spd.style.display = 'none'; t.mini.style.display = 'none'; t.drift.style.display = 'none'; t.cd.style.display = 'none'; return; }
+  if (!tr || !p || !p.me) { g.fillStyle = '#0b0b0e'; g.fillRect(0, 0, W, H); t.hud.innerHTML = ''; t.spd.style.display = 'none'; t.mini.style.display = 'none'; t.drift.style.display = 'none'; t.cd.style.display = 'none'; return; }
   const rt = now - DELAY, cars = [];
-  for (const [id, b] of t.buf) { const s = sample(b, rt); if (!s) continue; if (s.fl & 8) continue; const lk = t.look.get(id) || (id === 'ghost' ? t.look.get('me') : null) || { body: 'drift', color: '#888' }; cars.push(Object.assign({}, lk, { id, x: s.x, y: s.y, a: s.a, steer: s.steer || 0, drift: !!(s.fl & 1), brake: !!(s.fl & 2), hb: !!(s.fl & 4), fin: !!(s.fl & 16), layer: s.layer, name: id === 'ghost' ? '' : lk.name })); }
+  for (const [id, b] of t.buf) { const s = sample(b, rt); if (!s) continue; if (s.fl & 8) continue; const lk = t.look.get(id) || (id === 'ghost' ? t.look.get('me') : null) || { body: 'drift', color: '#888' }; cars.push(Object.assign({}, lk, { id, x: s.x, y: s.y, a: s.a, steer: s.steer || 0, drift: !!(s.fl & 1), brake: !!(s.fl & 2), hb: !!(s.fl & 4), fin: !!(s.fl & 16), rkOn: !!(s.fl & 32) && id !== 'ghost', rkLd: 1, layer: s.layer, name: id === 'ghost' ? '' : lk.name })); }
   const me = cars.find(c => c.id === 'me'), cam = t.cam, base = Math.min(W, H) / 820, spd = p && p.me ? p.me[8] : 0;
   // camera
   const k = 1 - Math.exp(-dt * 6);
@@ -163,8 +163,8 @@ function drawTile(t, now, dt) {
 }
 function drawRkFx(g, t, rt, now, cars) {
   for (const r of t.rk || []) { const s = Math.max(-0.3, Math.min(0.4, (rt - r.at) / 1000)), x = r.x + r.vx * s, y = r.y + r.vy * s, a = Math.atan2(r.vy, r.vx), ca = Math.cos(a), sa = Math.sin(a);
-    g.strokeStyle = 'rgba(255,190,90,.55)'; g.lineWidth = 6; g.lineCap = 'round'; g.beginPath(); g.moveTo(x - ca * 46, y - sa * 46); g.lineTo(x, y); g.stroke();
-    g.save(); g.translate(x, y); g.rotate(a); g.fillStyle = '#ddd'; g.fillRect(-14, -4, 22, 8); g.fillStyle = r.col; g.beginPath(); g.moveTo(8, -4); g.lineTo(16, 0); g.lineTo(8, 4); g.fill(); g.fillStyle = '#ffd24d'; g.beginPath(); g.arc(-16, 0, 4 + Math.random() * 3, 0, 7); g.fill(); g.restore(); }
+    g.lineCap = 'round'; for (let k = 0; k < 3; k++) { g.strokeStyle = 'rgba(205,205,215,' + (0.2 - k * 0.055) + ')'; g.lineWidth = 7 + k * 6; g.beginPath(); g.moveTo(x - ca * 22, y - sa * 22); g.lineTo(x - ca * (80 + k * 45), y - sa * (80 + k * 45)); g.stroke(); }
+    g.save(); g.translate(x, y); g.rotate(a); drawRocketShape(g, r.col, 1.3, 0.75 + Math.random() * 0.5); g.restore(); }
   t.bm = (t.bm || []).filter(b => rt - b.st < 950);
   for (const b of t.bm) { if (rt < b.st) continue; const k = (rt - b.st) / 950, R = 30 + 140 * Math.sqrt(k);
     g.globalAlpha = (1 - k) * 0.9; const gr = g.createRadialGradient(b.x, b.y, 0, b.x, b.y, R); gr.addColorStop(0, '#fff6c0'); gr.addColorStop(0.35, '#ffb020'); gr.addColorStop(0.7, b.col); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.beginPath(); g.arc(b.x, b.y, R, 0, 7); g.fill();

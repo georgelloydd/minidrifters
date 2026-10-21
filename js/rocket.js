@@ -7,14 +7,21 @@ G.rk = []; G.boom = [];
   const st = document.createElement('style');
   st.textContent = `#deathScr{position:fixed;inset:0;z-index:40;display:none;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;background:radial-gradient(ellipse at center,rgba(90,0,0,.35),rgba(20,0,0,.82));text-align:center;text-shadow:0 6px 24px rgba(0,0,0,.8)}
 #deathScr h1{margin:0;font-size:86px;font-weight:900;font-style:italic;letter-spacing:3px;color:var(--red,#ff2a2a)}#deathScr p{margin:6px 0;font-size:24px;font-weight:800;color:#eee}#deathScr b{color:#ffd400}
-#rkHud{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:20;display:none;pointer-events:none;background:rgba(12,12,14,.9);border:1px solid #2a2a30;border-left:3px solid var(--red,#ff2a2a);border-radius:8px;padding:6px 14px;font-weight:900;font-style:italic;letter-spacing:1px;font-size:14px;color:#eee;min-width:170px;text-align:center}
-#rkHud i{display:block;height:4px;border-radius:2px;background:#2a2a30;margin-top:5px;overflow:hidden}#rkHud i u{display:block;height:100%;width:100%;background:#ffb020;transform-origin:left}`;
+#rkHud{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);z-index:20;display:none;pointer-events:none;background:rgba(10,10,11,.72);border:1px solid var(--line,#2a2a30);border-left:3px solid var(--red,#ff2a2a);border-radius:6px;padding:6px 14px 7px;min-width:150px;color:#f2f2f2}
+#rkHud small{display:block;font-size:10px;letter-spacing:2px;color:var(--dim,#8a8a94);font-weight:800}
+#rkHud .rkr{display:flex;align-items:center;gap:8px;margin-top:2px}#rkHud .rkk{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:24px;padding:0 7px;border:1px solid #4a4a52;border-bottom-width:3px;border-radius:5px;background:#1b1b20;font-size:13px;font-weight:900;font-style:normal}
+#rkHud .rkr b{font-size:18px;font-weight:900;font-style:italic;letter-spacing:.5px}#rkHud.cool .rkr b{color:var(--dim,#8a8a94)}
+#rkHud i{display:block;height:3px;border-radius:2px;background:#2a2a30;margin-top:6px;overflow:hidden}#rkHud i u{display:block;height:100%;width:100%;background:#ffb020;transform-origin:left}
+body.touch #rkHud{bottom:calc(150px + env(safe-area-inset-bottom))}`;
   document.head.appendChild(st);
   const d = document.createElement('div'); d.id = 'deathScr'; d.innerHTML = '<h1>💥 WRECKED</h1><p id="dsBy"></p><p id="dsIn"></p>'; document.body.appendChild(d);
-  const h = document.createElement('div'); h.id = 'rkHud'; h.innerHTML = '🚀 ROCKET · <span id="rkKey">X</span><i><u id="rkBar"></u></i>'; document.body.appendChild(h);
+  const h = document.createElement('div'); h.id = 'rkHud'; h.innerHTML = '<small>ROCKET</small><div class="rkr"><span class="rkk" id="rkKey">X</span><b id="rkSt">FIRE</b></div><i><u id="rkBar"></u></i>'; document.body.appendChild(h);
 })();
 
 function rkAllowed() { if (G.spec) return false; return !!((typeof TWEAKS !== 'undefined' && TWEAKS.rl) || (G.cfg && G.cfg.pvp && G.mp && !G.tt)); }
+// a launcher pod on the roof of every car that can fire: you (when allowed) and everyone in a PvP race
+function rkCarOn(c) { if (!G.me || G.state === 'menu' || G.state === 'lobby' || G.state === 'replay') return false; if (c === G.me) return rkAllowed() && !c.dead; return !!(G.cfg && G.cfg.pvp && G.mp && !G.tt); }
+function rkCarLoad(c) { if (c !== G.me || TWEAKS.rnc || TWEAKS.raf) return 1; return 1 - Math.max(0, ((c.rkReady || 0) - performance.now()) / (RK.COOL * 1000)); }
 function rkReset() { G.rk = []; G.boom = []; if (G.me) { G.me.dead = 0; G.me.shield = 0; G.me.rkReady = 0; } const d = $('deathScr'); if (d) d.style.display = 'none'; const h = $('rkHud'); if (h) h.style.display = 'none'; }
 function rkName(id) { if (id === myId()) return CFG.name; const r = G.rem.get(id); return r ? r.car.name : 'Driver'; }
 function rkColor(id) { if (id === myId()) return CFG.color; const r = G.rem.get(id); return r ? r.car.color : '#ff8c1a'; }
@@ -64,7 +71,8 @@ function rocketTick(dt, now) {
   if (ok && TWEAKS.raf && G.state === 'race' && !me.dead && !me.finished && KEYS[CFG.keys.rocket]) { G.rkAcc = Math.min(8, (G.rkAcc || 0) + dt * RK.AUTO); while (G.rkAcc >= 1) { G.rkAcc--; rocketShoot(true); } } else G.rkAcc = 0;
   rkFlush(false);
   hud.style.display = ok && G.state === 'race' ? 'block' : 'none';
-  if (ok) { $('rkKey').textContent = keyName(CFG.keys.rocket) + (TWEAKS.raf ? ' (hold)' : ''); const left = TWEAKS.rnc || TWEAKS.raf ? 0 : Math.max(0, ((me.rkReady || 0) - now) / (RK.COOL * 1000)); $('rkBar').style.transform = 'scaleX(' + (1 - left) + ')'; $('rkBar').style.background = left > 0 ? '#777' : '#ffb020'; }
+  if (ok) { const left = TWEAKS.rnc || TWEAKS.raf ? 0 : Math.max(0, ((me.rkReady || 0) - now) / (RK.COOL * 1000)), kn = keyName(CFG.keys.rocket), stx = me.dead ? 'WRECKED' : TWEAKS.raf ? 'HOLD TO FIRE' : left > 0 ? 'RELOADING' : 'FIRE';
+    if ($('rkKey').textContent !== kn) $('rkKey').textContent = kn; if ($('rkSt').textContent !== stx) $('rkSt').textContent = stx; hud.classList.toggle('cool', left > 0 || !!me.dead); $('rkBar').style.transform = 'scaleX(' + (1 - left) + ')'; $('rkBar').style.background = left > 0 ? '#5a5a62' : '#ffb020'; }
   for (let i = G.rk.length - 1; i >= 0; i--) {
     const r = G.rk[i], ox = r.x, oy = r.y; r.x += r.vx * dt; r.y += r.vy * dt; r.life -= dt; r.sm = (r.sm || 0) - dt;
     if (r.sm <= 0 && CFG.gfx.smoke && !r.q && G.rk.length < 24) { r.sm = 0.025; G.smoke.push({ x: r.x - r.vx * 0.01, y: r.y - r.vy * 0.01, vx: 0, vy: 0, r: 7, life: 0, max: 0.5, col: '' }); }
@@ -79,12 +87,10 @@ function drawRocketFx(g) {
   const lite = G.rk.length > 40;
   for (const r of G.rk) {
     if (lite) { g.strokeStyle = '#ffb020'; g.lineWidth = 4; g.lineCap = 'round'; g.beginPath(); g.moveTo(r.x - r.vx * 0.022, r.y - r.vy * 0.022); g.lineTo(r.x, r.y); g.stroke(); g.fillStyle = '#fff'; g.beginPath(); g.arc(r.x, r.y, 3, 0, 7); g.fill(); continue; }
-    const a = Math.atan2(r.vy, r.vx); g.save(); g.translate(r.x, r.y); g.rotate(a);
-    g.save(); g.globalCompositeOperation = 'lighter'; const fl = g.createLinearGradient(0, 0, -70, 0); fl.addColorStop(0, 'rgba(255,200,80,.95)'); fl.addColorStop(1, 'rgba(255,60,0,0)'); g.fillStyle = fl; g.beginPath(); g.moveTo(-6, -4); g.lineTo(-60 - Math.random() * 14, 0); g.lineTo(-6, 4); g.fill();
-    const gl = g.createRadialGradient(0, 0, 1, 0, 0, 30); gl.addColorStop(0, 'rgba(255,170,60,.55)'); gl.addColorStop(1, 'rgba(255,100,0,0)'); g.fillStyle = gl; g.fillRect(-30, -30, 60, 60); g.restore();
-    g.fillStyle = '#d8d8de'; g.strokeStyle = '#000'; g.lineWidth = 1.5; g.beginPath(); g.roundRect(-12, -3.5, 24, 7, 3); g.fill(); g.stroke();
-    g.fillStyle = r.color || '#ff2a2a'; g.beginPath(); g.moveTo(12, -3.5); g.lineTo(20, 0); g.lineTo(12, 3.5); g.fill(); g.fillRect(-12, -6, 6, 12);
-    g.restore();
+    const a = Math.atan2(r.vy, r.vx), spd = Math.hypot(r.vx, r.vy) || 1, ux = r.vx / spd, uy = r.vy / spd;
+    g.save(); g.lineCap = 'round'; for (let k = 0; k < 3; k++) { g.strokeStyle = `rgba(205,205,215,${0.2 - k * 0.055})`; g.lineWidth = 7 + k * 6; g.beginPath(); g.moveTo(r.x - ux * 22, r.y - uy * 22); g.lineTo(r.x - ux * (80 + k * 45), r.y - uy * (80 + k * 45)); g.stroke(); } g.restore();
+    g.save(); g.globalCompositeOperation = 'lighter'; const gx = r.x - ux * 18, gy = r.y - uy * 18, gl = g.createRadialGradient(gx, gy, 1, gx, gy, 36); gl.addColorStop(0, 'rgba(255,190,80,.6)'); gl.addColorStop(1, 'rgba(255,90,0,0)'); g.fillStyle = gl; g.fillRect(gx - 36, gy - 36, 72, 72); g.restore();
+    g.save(); g.translate(r.x, r.y); g.rotate(a); drawRocketShape(g, r.color || '#ff2a2a', 1.3, 0.75 + Math.random() * 0.5); g.restore();
   }
   for (const b of G.boom) {
     const k = b.t / b.max, R = 30 + 150 * Math.sqrt(k); g.save(); g.globalCompositeOperation = 'lighter';

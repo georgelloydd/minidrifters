@@ -176,6 +176,29 @@ function drawCar(g, c, night) {
   else { if (id !== 'f1') { g.fillStyle = '#fff6c8'; g.fillRect(h - 4, -w + 3, 4, 6); g.fillRect(h - 4, w - 9, 4, 6); }
   g.fillStyle = c.brake ? '#ff2a2a' : '#8a1010'; g.fillRect(-h, -w + 3, 3, 6); g.fillRect(-h, w - 9, 3, 6); }
   if (c.brake) { g.save(); g.globalCompositeOperation = 'lighter'; const rg = g.createRadialGradient(-h, 0, 0, -h, 0, 40); rg.addColorStop(0, 'rgba(255,40,40,.5)'); rg.addColorStop(1, 'rgba(255,40,40,0)'); g.fillStyle = rg; g.fillRect(-h - 40, -40, 50, 80); g.restore(); }
+  { const rk = c.rkOn !== undefined ? c.rkOn : (typeof rkCarOn === 'function' && rkCarOn(c));
+    if (rk) { const ld = c.rkLd !== undefined ? c.rkLd : (typeof rkCarLoad === 'function' ? rkCarLoad(c) : 1), s = L / 58;
+      g.save(); g.translate(-L * 0.04, 0); g.scale(s, s);
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.beginPath(); g.roundRect(-14, -4.5, 32, 12, 4); g.fill();
+      g.fillStyle = '#1c1c20'; g.beginPath(); g.roundRect(-16, -6, 32, 12, 4); g.fill(); g.strokeStyle = 'rgba(255,255,255,.14)'; g.lineWidth = 1; g.stroke();
+      g.fillStyle = '#3a3a42'; g.fillRect(-12, -1, 26, 2);
+      if (ld >= 1) drawRocketShape(g, col, 0.85, 0); else { g.fillStyle = '#ffb020'; g.fillRect(-12, -1, 26 * Math.max(0, ld), 2); }
+      g.restore(); } }
+  g.restore();
+}
+// Shared rocket sprite (points along +x, centred on the body). Used in-game, on car roofs and on the spectate page.
+function drawRocketShape(g, col, sc, flame) {
+  g.save(); g.scale(sc, sc); col = col || '#ff2a2a';
+  if (flame > 0) { g.save(); g.globalCompositeOperation = 'lighter'; const L = 14 + 26 * flame, fg = g.createLinearGradient(-15, 0, -15 - L, 0); fg.addColorStop(0, 'rgba(255,250,215,.95)'); fg.addColorStop(0.3, 'rgba(255,180,60,.85)'); fg.addColorStop(1, 'rgba(255,60,0,0)'); g.fillStyle = fg; g.beginPath(); g.moveTo(-15, -3); g.quadraticCurveTo(-15 - L * 0.55, -5.5, -15 - L, 0); g.quadraticCurveTo(-15 - L * 0.55, 5.5, -15, 3); g.fill(); g.restore(); }
+  const dk = typeof shadeHex === 'function' ? shadeHex(col, 0.6) : col;
+  g.fillStyle = dk; g.beginPath(); g.moveTo(-6, -3.4); g.lineTo(-14, -8.5); g.lineTo(-15, -3.4); g.closePath(); g.moveTo(-6, 3.4); g.lineTo(-14, 8.5); g.lineTo(-15, 3.4); g.closePath(); g.fill();
+  const bg = g.createLinearGradient(0, -3.6, 0, 3.6); bg.addColorStop(0, '#ffffff'); bg.addColorStop(0.5, '#d6d7dc'); bg.addColorStop(1, '#8c8d95');
+  g.fillStyle = bg; g.beginPath(); g.roundRect(-14, -3.6, 23, 7.2, 2.5); g.fill();
+  g.fillStyle = col; g.fillRect(-9, -3.6, 3, 7.2);
+  g.beginPath(); g.moveTo(8.5, -3.6); g.quadraticCurveTo(15, -3.2, 19, 0); g.quadraticCurveTo(15, 3.2, 8.5, 3.6); g.closePath(); g.fill();
+  g.fillStyle = 'rgba(255,255,255,.55)'; g.fillRect(-12, -2.6, 19, 1.2);
+  g.fillStyle = '#2a2a2e'; g.fillRect(-16, -2.4, 2, 4.8);
+  g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 0.8; g.beginPath(); g.roundRect(-14, -3.6, 23, 7.2, 2.5); g.stroke();
   g.restore();
 }
 // Garage preview canvas: drawCarPreview(canvas, look, angle) (old form (canvas, body, color, livery, angle) still works)
