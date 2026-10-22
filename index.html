@@ -17,7 +17,7 @@
 <meta property="og:title" content="Mini Drifters">
 <meta property="og:description" content="A free top-down drift racing game in your browser.">
 <meta property="og:image" content="https://georgelloydd.github.io/minidrifters/icon-512.png">
-<link rel="stylesheet" href="style.css?v=20261021123443">
+<link rel="stylesheet" href="style.css?v=20261022101814">
 </head>
 <body>
 <canvas id="cv"></canvas>
@@ -108,6 +108,9 @@
           <div class="row"><input id="keyIn" placeholder="MD-XXXX-XXXX-XXXX or backup code"><button class="btn dark sm" id="bSignIn">Sign in</button></div>
           <p class="hint">Paste your account key, or a backup code from another device.</p>
           <p id="signMsg" class="msg"></p>
+          <p class="hint"><a href="#" id="krOpen" style="color:inherit;text-decoration:underline">Forgot your key? Ask the admin</a></p>
+          <div id="krBox" style="display:none"><label>Name you played as</label><div class="row"><input id="krName" maxlength="20" placeholder="Your driver name"></div><label>Message for the admin (optional)</label><div class="row"><input id="krNote" maxlength="200" placeholder="e.g. tracks you played, your best car"></div><div class="row"><button class="btn dark sm" id="krSend">Send request</button></div></div>
+          <p id="krMsg" class="msg"></p>
         </div>
       </div>
       <div id="acctIn" class="hidden">
@@ -163,26 +166,27 @@
 
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-<script src="js/config.js?v=20261021123443"></script>
-<script src="js/track.js?v=20261021123443"></script>
-<script src="js/car.js?v=20261021123443"></script>
-<script src="js/cars.js?v=20261021123443"></script>
-<script src="js/net.js?v=20261021123443"></script>
-<script src="js/session.js?v=20261021123443"></script>
-<script src="js/audio.js?v=20261021123443"></script>
-<script src="js/main.js?v=20261021123443"></script>
-<script src="js/dialog.js?v=20261021123443"></script>
-<script src="js/picker.js?v=20261021123443"></script>
-<script src="js/account.js?v=20261021123443"></script>
-<script src="js/render.js?v=20261021123443"></script>
-<script src="js/shop.js?v=20261021123443"></script>
-<script src="js/replay.js?v=20261021123443"></script>
-<script src="js/ui.js?v=20261021123443"></script>
-<script src="js/rocket.js?v=20261021123443"></script>
-<script src="js/bomb.js?v=20261021123443"></script>
-<script src="js/ban.js?v=20261021123443"></script>
-<script src="js/device.js?v=20261021123443"></script>
-<script src="js/control.js?v=20261021123443"></script>
-<script src="js/music.js?v=20261021123443"></script>
+<script src="js/config.js?v=20261022101814"></script>
+<script src="js/track.js?v=20261022101814"></script>
+<script src="js/car.js?v=20261022101814"></script>
+<script src="js/cars.js?v=20261022101814"></script>
+<script src="js/net.js?v=20261022101814"></script>
+<script src="js/session.js?v=20261022101814"></script>
+<script src="js/audio.js?v=20261022101814"></script>
+<script src="js/main.js?v=20261022101814"></script>
+<script src="js/dialog.js?v=20261022101814"></script>
+<script src="js/picker.js?v=20261022101814"></script>
+<script src="js/account.js?v=20261022101814"></script>
+<script src="js/render.js?v=20261022101814"></script>
+<script src="js/shop.js?v=20261022101814"></script>
+<script src="js/replay.js?v=20261022101814"></script>
+<script src="js/ui.js?v=20261022101814"></script>
+<script src="js/rocket.js?v=20261022101814"></script>
+<script src="js/bomb.js?v=20261022101814"></script>
+<script src="js/ban.js?v=20261022101814"></script>
+<script src="js/device.js?v=20261022101814"></script>
+<script src="js/keyreq.js?v=20261022101814"></script>
+<script src="js/control.js?v=20261022101814"></script>
+<script src="js/music.js?v=20261022101814"></script>
 </body>
 </html>

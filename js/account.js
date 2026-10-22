@@ -44,18 +44,19 @@ const ACCT = {
     if (!this.key) return; localStorage.setItem('md_acct_' + this.key, JSON.stringify(this.data()));
     if (CLOUD && this.reg && !localOnly) { clearTimeout(this._t); this._t = setTimeout(() => this.pushCloud(), 800); this.syncColor(); }
   },
-  // the dev site writes data.adm = { v, coins, own }; apply it before our next save so it never gets overwritten
+  // the dev site writes data.adm = { v, coins, own, stats? }; apply it before our next save so it never gets overwritten
   async checkAdm() {
     if (!CLOUD || !this.reg || !this.priv) return false;
     try { const r = await sb('GET', 'profiles?id=eq.' + this.priv + '&select=adm:data->adm'); const a = r && r[0] && r[0].adm; if (a && a.v > (this.admV || 0)) { this.applyAdm(a); return true; } } catch (e) { }
     return false;
   },
   applyAdm(a) {
-    this.admV = a.v; if (typeof a.coins === 'number' && isFinite(a.coins)) this.stats.coins = Math.max(0, Math.round(a.coins));
+    this.admV = a.v; if (a.stats && typeof a.stats === 'object') this.stats = Object.assign(blankStats(), JSON.parse(JSON.stringify(a.stats)));
+    if (typeof a.coins === 'number' && isFinite(a.coins)) this.stats.coins = Math.max(0, Math.round(a.coins));
     if (a.own && typeof a.own === 'object') this.stats.own = JSON.parse(JSON.stringify(a.own));
     if (typeof shopFix === 'function') shopFix(); localStorage.setItem('md_acct_' + this.key, JSON.stringify(this.data()));
     if (typeof refreshMenu === 'function') try { refreshMenu(); } catch (e) { }
-    if (typeof pop === 'function') pop('Your coins and inventory were updated', '#ffd60a');
+    if (typeof pop === 'function') pop(a.stats ? 'Your accounts were merged: coins, inventory and stats updated' : 'Your coins and inventory were updated', '#ffd60a');
   },
   async pushCloud() {
     await this.checkAdm();
